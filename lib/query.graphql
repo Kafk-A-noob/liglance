@@ -1,0 +1,54 @@
+# index.jsx に埋め込んでいる GraphQL クエリの「人間が読む用」コピー。
+# 実体は index.jsx の中で文字列として送っているので、ここを書き換えても動作は変わらない。
+# クエリを試したいときは Linear の GraphQL Playground にこのまま貼れる。
+#   https://studio.apollographql.com/sandbox/explorer (Linear のドキュメント参照)
+
+query LinearGlance {
+  viewer {
+    id
+    name
+
+    # === 「Mine」タブで使う: 自分にアサインされた未完了 Issue ===
+    assignedIssues(
+      filter: { state: { type: { neq: "completed" } } }
+      first: 30
+      orderBy: updatedAt
+    ) {
+      nodes {
+        identifier
+        title
+        url
+        updatedAt
+        state { name color type }
+        project { name }
+        team { key }
+      }
+    }
+
+    # === 「Team」タブで使う: 自分が所属する全チームの未完了 Issue ===
+    teamMemberships {
+      nodes {
+        team {
+          id
+          key
+          name
+          issues(
+            filter: { state: { type: { neq: "completed" } } }
+            first: 30
+            orderBy: updatedAt
+          ) {
+            nodes {
+              identifier
+              title
+              url
+              updatedAt
+              state { name color type }
+              project { name }
+              assignee { displayName }
+            }
+          }
+        }
+      }
+    }
+  }
+}

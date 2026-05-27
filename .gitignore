@@ -1,0 +1,20 @@
+# macOS
+.DS_Store
+
+# Node（将来 lint やビルドを足したときのため先に書いておく）
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# エディタ
+.vscode/
+*.local
+
+# 念のため: .env 系は本プロジェクトでは作らない方針だが、誤って置いた時の保険
+.env
+.env.*
+!.env.example
+
+# Übersicht がウィジェットフォルダ内に出すキャッシュ系（あれば）
+*.log
