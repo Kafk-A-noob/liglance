@@ -18,3 +18,10 @@ yarn-error.log*
 
 # Übersicht がウィジェットフォルダ内に出すキャッシュ系（あれば）
 *.log
+
+# Tauri / Rust
+packages/menubar/dist/
+packages/menubar/src-tauri/target/
+packages/menubar/src-tauri/gen/schemas/
+packages/menubar/src-tauri/WixTools/
+**/Cargo.lock.bak

@@ -1,0 +1,26 @@
+[package]
+name = "linear-glance"
+version = "0.1.0"
+description = "Linear issue menubar app"
+authors = ["n.masaru"]
+edition = "2021"
+
+[lib]
+name = "linear_glance_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon", "macos-private-api"] }
+tauri-plugin-opener = "2"
+tauri-plugin-http = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# Keychain アクセス用
+keyring = "3"
+# 非同期ランタイム（HTTP リクエスト用）
+tokio = { version = "1", features = ["full"] }
+# HTTP クライアント
+reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
