@@ -8,8 +8,8 @@
 //   3. メニューバートレイアイコンの設置とクリックでウィンドウ表示
 // =====================================================================
 
-use keyring::Entry;
 use serde::{Deserialize, Serialize};
+use std::process::Command;
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
@@ -19,36 +19,95 @@ use tauri::{
 /// Übersicht ウィジェットと共有する Keychain サービス名
 const KEYCHAIN_SERVICE: &str = "linear-widget-token";
 
-/// Keychain の Account 名（macOS の `-a` 相当）
 fn keychain_account() -> String {
     std::env::var("USER").unwrap_or_else(|_| "default".to_string())
 }
 
 // --- Tauri コマンド: トークン CRUD ----------------------------------------
+//
+// macOS Keychain への読み書きは Apple 署名済みの `security` CLI 経由で行う。
+// keyring crate を使うと、dev ビルド（未署名バイナリ）では ACL の都合で
+// 保存できても読み出せないケースが頻発するため。
+// shell 経由なら Übersicht 版と完全に同じ経路になり、両方が同じ値を見られる。
 
+/// keychain にエントリーがあるかどうか
 #[tauri::command]
 fn token_exists() -> bool {
-    Entry::new(KEYCHAIN_SERVICE, &keychain_account())
-        .and_then(|e| e.get_password())
-        .is_ok()
+    Command::new("security")
+        .args([
+            "find-generic-password",
+            "-a",
+            &keychain_account(),
+            "-s",
+            KEYCHAIN_SERVICE,
+        ])
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
 }
 
 #[tauri::command]
 fn save_token(token: String) -> Result<(), String> {
-    let entry = Entry::new(KEYCHAIN_SERVICE, &keychain_account())
-        .map_err(|e| format!("keyring entry: {}", e))?;
-    entry
-        .set_password(&token)
-        .map_err(|e| format!("keyring set: {}", e))?;
+    let output = Command::new("security")
+        .args([
+            "add-generic-password",
+            "-a",
+            &keychain_account(),
+            "-s",
+            KEYCHAIN_SERVICE,
+            "-w",
+            &token,
+            "-U", // 既存なら上書き
+        ])
+        .output()
+        .map_err(|e| format!("security command spawn failed: {}", e))?;
+    if !output.status.success() {
+        return Err(format!(
+            "security add-generic-password failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
     Ok(())
 }
 
 #[tauri::command]
 fn delete_token() -> Result<(), String> {
-    let entry = Entry::new(KEYCHAIN_SERVICE, &keychain_account())
-        .map_err(|e| format!("keyring entry: {}", e))?;
-    let _ = entry.delete_credential();
+    let _ = Command::new("security")
+        .args([
+            "delete-generic-password",
+            "-a",
+            &keychain_account(),
+            "-s",
+            KEYCHAIN_SERVICE,
+        ])
+        .output();
     Ok(())
+}
+
+/// Keychain から実際にトークンを取り出す（内部用）
+fn read_token() -> Result<String, String> {
+    let output = Command::new("security")
+        .args([
+            "find-generic-password",
+            "-a",
+            &keychain_account(),
+            "-s",
+            KEYCHAIN_SERVICE,
+            "-w",
+        ])
+        .output()
+        .map_err(|e| format!("security command spawn failed: {}", e))?;
+    if !output.status.success() {
+        return Err(format!(
+            "NO_TOKEN: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+    let token = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if token.is_empty() {
+        return Err("EMPTY_TOKEN".to_string());
+    }
+    Ok(token)
 }
 
 // --- Tauri コマンド: Linear API ------------------------------------------
@@ -92,11 +151,7 @@ query {
 
 #[tauri::command]
 async fn fetch_linear() -> Result<String, String> {
-    let entry = Entry::new(KEYCHAIN_SERVICE, &keychain_account())
-        .map_err(|e| format!("keyring: {}", e))?;
-    let token = entry
-        .get_password()
-        .map_err(|_| "NO_TOKEN".to_string())?;
+    let token = read_token()?;
 
     let body = GqlBody {
         query: QUERY.to_string(),
@@ -156,7 +211,8 @@ pub fn run() {
             let app_handle = app.handle().clone();
             let _tray = TrayIconBuilder::with_id("main")
                 .icon(app.default_window_icon().unwrap().clone())
-                .icon_as_template(true) // macOS テンプレート画像扱い（白黒適応）
+                .icon_as_template(false) // ひとまずカラーで見やすく（後で template 用 PNG 差し替え予定）
+                .title("LG") // メニューバーに "LG" の文字も出す（アイコン見えない対策）
                 .menu(&menu)
                 .show_menu_on_left_click(false) // 左クリックは独自処理
                 .on_menu_event(move |app, event| {

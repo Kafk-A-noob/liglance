@@ -177,7 +177,14 @@ function Dashboard() {
         </div>
       )}
 
-      <IssueList tab={tab} projectId={projectId} issues={issues} />
+      {lastError && !viewer ? (
+        <div className="error" style={{ textAlign: "left", padding: "12px 4px", fontSize: 11, wordBreak: "break-all" }}>
+          <b>エラー:</b><br />
+          {lastError}
+        </div>
+      ) : (
+        <IssueList tab={tab} projectId={projectId} issues={issues} />
+      )}
     </div>
   );
 }
