@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  LiGlance app icon (Dock / Finder / .icns 用).
+  - viewBox 1024x1024 で設計
+  - macOS Big Sur 以降の角丸スクエア
+  - 背景: 深い藍 → 紫のグラデ
+  - 中央に "lig" + 右側に流れ線（読み下す視線 = glance）
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" fill="none">
+  <!-- 背景: macOS スタイルの角丸スクエア + グラデーション -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1024" y2="1024" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1B1E36"/>
+      <stop offset="1" stop-color="#3A2D5C"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#A78BFA"/>
+      <stop offset="1" stop-color="#7C3AED"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 角丸スクエア背景（macOS の squircle に近い 22% 角丸） -->
+  <rect x="0" y="0" width="1024" height="1024" rx="225" ry="225" fill="url(#bg)"/>
+
+  <!-- 中央に lig + 流れ線（viewBox 32x32 のものを座標変換でスケール） -->
+  <!-- 16x16 → 1024x1024 に拡大: 中央配置するため translate と scale -->
+  <g transform="translate(180, 200) scale(22)">
+    <!-- l: 縦線 -->
+    <rect x="6" y="6" width="3" height="20" rx="1.5" fill="#fff"/>
+
+    <!-- i: ドット + 縦線 -->
+    <circle cx="14.5" cy="8" r="2" fill="url(#accent)"/>
+    <rect x="13" y="12" width="3" height="14" rx="1.5" fill="#fff"/>
+
+    <!-- g: 円 + 尾 -->
+    <circle cx="22" cy="18" r="5" stroke="#fff" stroke-width="2.5" fill="none"/>
+    <path d="M 26 18 L 26 24 Q 26 28 22 28" stroke="#fff" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  </g>
+
+  <!-- 流れ線: 右下から右へ伸びる細い弧 -->
+  <path d="M 720 640 Q 820 620 920 660"
+        stroke="url(#accent)" stroke-width="14" fill="none" stroke-linecap="round" opacity="0.8"/>
+  <circle cx="920" cy="660" r="14" fill="url(#accent)"/>
+</svg>

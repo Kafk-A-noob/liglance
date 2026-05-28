@@ -13,7 +13,7 @@ use std::process::Command;
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    Manager, PhysicalPosition, WebviewWindow,
+    Emitter, Manager, PhysicalPosition, WebviewWindow,
 };
 
 /// Übersicht ウィジェットと共有する Keychain サービス名
@@ -205,19 +205,38 @@ pub fn run() {
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
 
             // トレイアイコンのメニュー（右クリック用）
+            let reset_item = MenuItem::with_id(app, "reset_token", "Reset token…", true, None::<&str>)?;
             let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&quit_item])?;
+            let menu = Menu::with_items(app, &[&reset_item, &quit_item])?;
 
             let app_handle = app.handle().clone();
+            // トレイアイコン（メニューバー用、テンプレート画像=黒一色+アルファ）
+            // PNG をバイナリへ埋め込み、起動時に RGBA へデコードして Image を作る
+            let tray_png = include_bytes!("../icons/tray-32.png");
+            let decoded = image::load_from_memory(tray_png)?.to_rgba8();
+            let (tw, th) = decoded.dimensions();
+            let tray_icon = tauri::image::Image::new_owned(decoded.into_raw(), tw, th);
+
             let _tray = TrayIconBuilder::with_id("main")
-                .icon(app.default_window_icon().unwrap().clone())
-                .icon_as_template(false) // ひとまずカラーで見やすく（後で template 用 PNG 差し替え予定）
-                .title("LG") // メニューバーに "LG" の文字も出す（アイコン見えない対策）
+                .icon(tray_icon)
+                .icon_as_template(true) // macOS が白黒を menu bar に合わせて反転
                 .menu(&menu)
                 .show_menu_on_left_click(false) // 左クリックは独自処理
                 .on_menu_event(move |app, event| {
-                    if event.id == "quit" {
-                        app.exit(0);
+                    match event.id.as_ref() {
+                        "quit" => app.exit(0),
+                        "reset_token" => {
+                            // Keychain からトークン削除 → frontend にイベント通知 →
+                            // App.tsx 側で hasToken=false に戻し、ウィザード再表示
+                            let _ = delete_token();
+                            let _ = app.emit("token-reset", ());
+                            // ウィザードを見せるためにウィンドウも開く
+                            if let Some(window) = app.get_webview_window("main") {
+                                let _ = window.show();
+                                let _ = window.set_focus();
+                            }
+                        }
+                        _ => {}
                     }
                 })
                 .on_tray_icon_event(move |tray, event| {

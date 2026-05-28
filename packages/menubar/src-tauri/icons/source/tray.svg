@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  LiGlance tray icon (template image for macOS menubar).
+  - viewBox 32x32 で設計（実際の表示は 16-22px 程度）
+  - 黒一色 + 透過。macOS が自動で白黒反転（template image 扱い）
+  - 図形: 小文字 "lig"（ジオメトリック）
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <!-- l: 左寄りの縦線 -->
+  <rect x="6" y="6" width="3" height="20" rx="1.5" fill="#000"/>
+
+  <!-- i: ドット + 縦線 -->
+  <circle cx="14.5" cy="8" r="2" fill="#000"/>
+  <rect x="13" y="12" width="3" height="14" rx="1.5" fill="#000"/>
+
+  <!-- g: 円 + 下に伸びる尾 -->
+  <!-- 円（bowl） -->
+  <circle cx="22" cy="18" r="5" stroke="#000" stroke-width="2.5" fill="none"/>
+  <!-- descender（gの尻尾） -->
+  <path d="M 26 18 L 26 24 Q 26 28 22 28" stroke="#000" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+</svg>

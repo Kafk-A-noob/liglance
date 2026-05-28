@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { listen } from "@tauri-apps/api/event";
 import { tokenExists, saveToken, fetchLinear } from "./api";
 import type { Issue, LinearResponse, Project, Tab, Viewer } from "./types";
 import { formatRelative, formatTime, redactSecrets } from "./utils";
@@ -11,6 +12,14 @@ export default function App() {
 
   useEffect(() => {
     tokenExists().then(setHasToken);
+  }, []);
+
+  // トレイメニューの "Reset token" が押されたらウィザードに戻す
+  useEffect(() => {
+    const promise = listen("token-reset", () => setHasToken(false));
+    return () => {
+      promise.then((unlisten) => unlisten());
+    };
   }, []);
 
   if (hasToken === null) {
