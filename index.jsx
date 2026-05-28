@@ -22,10 +22,68 @@ const FETCH_CMD = "bash linear-glance.widget/lib/fetch.sh 2>/dev/null || bash li
 export const command = FETCH_CMD;
 export const refreshFrequency = 60_000; // 1 分
 
+// --- 位置（ドラッグで移動） ---------------------------------------------
+//
+// localStorage に座標を保存し、起動時に復元する。
+// className の top / left は CSS 変数を参照し、JS から書き換える。
+//
+const POS_KEY = "linear-glance.pos";
+/** @type {{top:number,left:number} | null} */
+let currentPos = null;
+
+function loadPos() {
+  try {
+    const s = localStorage.getItem(POS_KEY);
+    if (s) return JSON.parse(s);
+  } catch {}
+  // デフォルト: 右上
+  const left = (window.innerWidth || 1280) - 380 - 24;
+  return { left, top: 80 };
+}
+function savePos(p) {
+  try { localStorage.setItem(POS_KEY, JSON.stringify(p)); } catch {}
+}
+function applyPos(p) {
+  document.documentElement.style.setProperty("--lg-left", p.left + "px");
+  document.documentElement.style.setProperty("--lg-top", p.top + "px");
+}
+function ensurePosInitialized() {
+  if (currentPos == null) {
+    currentPos = loadPos();
+    applyPos(currentPos);
+  }
+}
+function startDrag(e) {
+  // ボタンや select の上でのクリックはドラッグ開始しない
+  const tag = e.target?.tagName;
+  if (tag === "BUTTON" || tag === "SELECT" || tag === "OPTION") return;
+  if (e.target?.closest && e.target.closest("button, select")) return;
+
+  e.preventDefault();
+  ensurePosInitialized();
+  const start = { ...currentPos };
+  const mouse = { x: e.clientX, y: e.clientY };
+  const onMove = (ev) => {
+    const np = {
+      left: Math.max(0, start.left + (ev.clientX - mouse.x)),
+      top: Math.max(0, start.top + (ev.clientY - mouse.y)),
+    };
+    currentPos = np;
+    applyPos(np);
+  };
+  const onUp = () => {
+    document.removeEventListener("mousemove", onMove);
+    document.removeEventListener("mouseup", onUp);
+    savePos(currentPos);
+  };
+  document.addEventListener("mousemove", onMove);
+  document.addEventListener("mouseup", onUp);
+}
+
 // --- スタイル -----------------------------------------------------------
 export const className = `
-  top: 80px;
-  right: 24px;
+  top: var(--lg-top, 80px);
+  left: var(--lg-left, calc(100vw - 404px));
   width: 380px;
   max-height: 80vh;
   overflow: hidden;
@@ -41,13 +99,17 @@ export const className = `
   padding: 10px 12px;
   box-shadow: 0 8px 24px rgba(0,0,0,0.35);
 
-  /* ヘッダー行 */
+  /* ヘッダー行（ドラッグハンドル） */
   header {
     display: flex;
     align-items: center;
     gap: 6px;
     margin-bottom: 8px;
+    cursor: grab;
+    user-select: none;
   }
+  header:active { cursor: grabbing; }
+  header button { cursor: pointer; } /* ボタン部分はポインタに戻す */
   header .brand { font-weight: 600; opacity: 0.85; }
   header .status-dot {
     width: 8px; height: 8px; border-radius: 50%;
@@ -330,8 +392,11 @@ function renderHeader(state, dispatch) {
       .catch((err) => dispatch({ type: "MANUAL_RESULT", error: err }));
   };
 
+  // 初回 render で位置を復元
+  ensurePosInitialized();
+
   return (
-    <header>
+    <header onMouseDown={startDrag}>
       <span className="brand">Linear</span>
       <span className="status-dot" style={{ background: statusColor, color: statusColor }} title={statusTitle} />
       <span className="last-updated">{lastUpdated ? formatTime(lastUpdated) : "—"}</span>
@@ -422,10 +487,18 @@ function formatRelative(iso) {
   return new Date(iso).toLocaleDateString();
 }
 
-/** timestamp(ms) → "13:42" */
+/** timestamp(ms) → "MM/DD 13:42"（同じ日なら時刻のみ、別日なら日付＋時刻） */
 function formatTime(ms) {
   const d = new Date(ms);
+  const now = new Date();
+  const sameDay =
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate();
   const h = String(d.getHours()).padStart(2, "0");
   const m = String(d.getMinutes()).padStart(2, "0");
-  return `${h}:${m}`;
+  if (sameDay) return `${h}:${m}`;
+  const mo = String(d.getMonth() + 1).padStart(2, "0");
+  const da = String(d.getDate()).padStart(2, "0");
+  return `${mo}/${da} ${h}:${m}`;
 }
