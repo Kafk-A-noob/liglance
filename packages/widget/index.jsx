@@ -1,5 +1,5 @@
 // =====================================================================
-// linear-glance — Linear の Issue をデスクトップにチラ見するウィジェット
+// LiGlance — Linear の Issue をデスクトップにチラ見するウィジェット
 // =====================================================================
 //
 // 機能:
@@ -17,7 +17,8 @@
 
 import { run } from "uebersicht";
 
-const FETCH_CMD = "bash linear-glance.widget/lib/fetch.sh 2>/dev/null || bash lib/fetch.sh 2>/dev/null";
+// Übersicht の cwd は widgets フォルダ。symlink 名 (liglance.widget) を経由する
+const FETCH_CMD = "bash liglance.widget/lib/fetch.sh 2>/dev/null || bash lib/fetch.sh 2>/dev/null";
 
 export const command = FETCH_CMD;
 export const refreshFrequency = 60_000; // 1 分
@@ -27,6 +28,7 @@ export const refreshFrequency = 60_000; // 1 分
 // localStorage に座標を保存し、起動時に復元する。
 // className の top / left は CSS 変数を参照し、JS から書き換える。
 //
+// 注: 旧名 "linear-glance.pos" のままにしてある（既に設定済みの位置が消えないように）
 const POS_KEY = "linear-glance.pos";
 /** @type {{top:number,left:number} | null} */
 let currentPos = null;
@@ -487,18 +489,12 @@ function formatRelative(iso) {
   return new Date(iso).toLocaleDateString();
 }
 
-/** timestamp(ms) → "MM/DD 13:42"（同じ日なら時刻のみ、別日なら日付＋時刻） */
+/** timestamp(ms) → "MM/DD HH:mm" 形式で常に日付付き */
 function formatTime(ms) {
   const d = new Date(ms);
-  const now = new Date();
-  const sameDay =
-    d.getFullYear() === now.getFullYear() &&
-    d.getMonth() === now.getMonth() &&
-    d.getDate() === now.getDate();
-  const h = String(d.getHours()).padStart(2, "0");
-  const m = String(d.getMinutes()).padStart(2, "0");
-  if (sameDay) return `${h}:${m}`;
   const mo = String(d.getMonth() + 1).padStart(2, "0");
   const da = String(d.getDate()).padStart(2, "0");
+  const h = String(d.getHours()).padStart(2, "0");
+  const m = String(d.getMinutes()).padStart(2, "0");
   return `${mo}/${da} ${h}:${m}`;
 }

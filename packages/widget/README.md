@@ -1,4 +1,4 @@
-# linear-glance
+# LiGlance — widget (Übersicht)
 
 Mac のデスクトップに Linear の Issue をチラ見できるウィジェット。
 [Übersicht](https://tracesof.net/uebersicht/) 上で動く個人ツール。
@@ -26,7 +26,7 @@ open -a Übersicht
 ### 2. Linear Personal API Key を発行する
 
 Linear → Settings → My Account → Security & access → **Personal API keys** → New API key
-- ラベル: `linear-glance` など
+- ラベル: `liglance` など
 - 発行された `lin_api_xxxxxxxxxxxx` を控える（**ファイルやチャットには貼らない**）
 
 ### 3. Keychain にトークンを保存する
@@ -48,8 +48,8 @@ security add-generic-password \
 ### 4. Übersicht の widgets フォルダにシンボリックリンクを張る
 
 ```bash
-ln -s /Users/n.masaru/pri/linear-glance \
-  "$HOME/Library/Application Support/Übersicht/widgets/linear-glance.widget"
+ln -s /Users/n.masaru/pri/liglance \
+  "$HOME/Library/Application Support/Übersicht/widgets/liglance.widget"
 ```
 
 > `.widget` で終わる必要がある（Übersicht の規約）
@@ -62,7 +62,7 @@ ln -s /Users/n.masaru/pri/linear-glance \
 ## ファイル構成
 
 ```
-linear-glance/
+liglance/
 ├── index.jsx          # ウィジェット本体
 ├── lib/
 │   ├── token.sh       # Keychain → トークンを取り出すだけのスクリプト
@@ -78,7 +78,7 @@ linear-glance/
 | 「Keychain にトークンがありません」 | 上記セットアップ 3 が未実施 |
 | 「Linear に接続できませんでした」 | ネットワーク or トークン無効。Linear 側で API key を再発行する |
 | 何も出ない | Übersicht メニュー → Open Console でエラー確認 |
-| シンボリックリンクを辿らない | `~/Library/Application Support/Übersicht/widgets/linear-glance.widget` が存在するか確認 |
+| シンボリックリンクを辿らない | `~/Library/Application Support/Übersicht/widgets/liglance.widget` が存在するか確認 |
 
 ## 将来 Infisical に移行するとき
 

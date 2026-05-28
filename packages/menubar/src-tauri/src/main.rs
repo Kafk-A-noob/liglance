@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    linear_glance_lib::run()
+    liglance_lib::run()
 }

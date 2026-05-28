@@ -1,4 +1,4 @@
-# linear-glance — menubar (Tauri)
+# LiGlance — menubar (Tauri)
 
 メニューバーに常駐する Linear Issue ビューア。
 **Mac の通常アプリ** として動くので、Übersicht 版と違いクリックで前面に出ます。

@@ -11,7 +11,7 @@
 set -u  # 未定義変数だけ厳しく。-e は使わない（フォールバックを自分で書くため）
 
 # デバッグログ（Übersicht の bash 環境で何が起きているか後から確認できるように）
-LOG=/tmp/linear-glance.log
+LOG=/tmp/liglance.log
 {
   echo "--- $(date '+%H:%M:%S') ---"
   echo "PATH=$PATH"
@@ -67,7 +67,7 @@ GRAPHQL
 
 # 3. クエリをファイルに書き出し、curl の --data-urlencode で送る
 #    （python3 / jq に依存しない＝Übersicht の最小 PATH でも動く）
-TMP=$(mktemp -t linear-glance.XXXXXX)
+TMP=$(mktemp -t liglance.XXXXXX)
 trap 'rm -f "$TMP"' EXIT
 # 改行を空白に圧縮してから JSON 文字列として渡す
 COMPACT=$(printf '%s' "$QUERY" | tr '\n' ' ')

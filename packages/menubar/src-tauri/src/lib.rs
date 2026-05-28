@@ -1,5 +1,5 @@
 // =====================================================================
-// linear-glance menubar — Tauri 2 backend
+// LiGlance (Linear issues Glance) menubar — Tauri 2 backend
 // =====================================================================
 // 役割:
 //   1. Keychain への API Key 保存／取得（service名は Übersicht 版と共通：

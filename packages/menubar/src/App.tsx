@@ -50,7 +50,7 @@ function TokenWizard({ onSaved }: { onSaved: () => void }) {
 
   return (
     <div className="root wizard">
-      <h2>Linear Glance へようこそ</h2>
+      <h2>LiGlance へようこそ</h2>
       <p>
         最初に Linear の Personal API Key が必要です。<br />
         Linear → Settings → My Account → <b>Security &amp; access</b> →

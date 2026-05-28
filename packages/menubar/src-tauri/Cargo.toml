@@ -1,12 +1,12 @@
 [package]
-name = "linear-glance"
+name = "liglance"
 version = "0.1.0"
-description = "Linear issue menubar app"
+description = "LiGlance — Linear issues Glance, menubar app for macOS"
 authors = ["n.masaru"]
 edition = "2021"
 
 [lib]
-name = "linear_glance_lib"
+name = "liglance_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

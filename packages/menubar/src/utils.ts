@@ -12,18 +12,12 @@ export function formatRelative(iso: string): string {
   return new Date(iso).toLocaleDateString();
 }
 
-/** timestamp(ms) → "MM/DD HH:mm"（同日なら時刻のみ） */
+/** timestamp(ms) → "MM/DD HH:mm" 形式で常に日付付き */
 export function formatTime(ms: number): string {
   const d = new Date(ms);
-  const now = new Date();
-  const sameDay =
-    d.getFullYear() === now.getFullYear() &&
-    d.getMonth() === now.getMonth() &&
-    d.getDate() === now.getDate();
-  const hh = String(d.getHours()).padStart(2, "0");
-  const mm = String(d.getMinutes()).padStart(2, "0");
-  if (sameDay) return `${hh}:${mm}`;
   const mo = String(d.getMonth() + 1).padStart(2, "0");
   const da = String(d.getDate()).padStart(2, "0");
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
   return `${mo}/${da} ${hh}:${mm}`;
 }
