@@ -2,57 +2,31 @@
 // linear-glance — Linear の Issue をデスクトップにチラ見するウィジェット
 // =====================================================================
 //
-// 【このファイルの読み方】
-// Übersicht のウィジェットは "export した値の集まり" として書く。
-//   - command           : シェルコマンド。標準出力が render に渡る
-//   - refreshFrequency  : 自動再実行の間隔（ms）
-//   - render            : command の出力を受け取って JSX を返す関数
-//   - className         : ウィジェットの位置とサイズ（CSS）
-//   - initialState      : ローカル状態の初期値（タブ切替などに使う）
-//   - updateState       : 上記 state を更新するレデューサ
+// 機能:
+//   - Mine / Team / Project の 3 タブ（Project はドロップダウンで選択）
+//   - 接続ステータスドット（緑=正常 / 黄=古い / 赤=エラー）
+//   - 最終更新時刻表示
+//   - 手動リロードボタン（🔄）
 //
-// React のフックは Übersicht 側で使えないため、Redux 風の
-// (state, action) => state という形でローカル状態を管理する。
-// "クラスコンポーネントの state" に近い API と思えばよい。
-//
-// 【勉強用メモ】
-// - TS にしていないのは Übersicht が .jsx 前提だから。型は JSDoc で軽く補う。
-// - GraphQL は1回叩いて Mine / Team 両方のデータを取得 → クライアント側で
-//   タブ切替時に再フェッチしないようにしている（=APIに優しく、表示も速い）。
+// 設計メモ:
+//   - initialState / updateState を使う state machine パターン
+//   - command の自動実行結果は updateState の 'UB/COMMAND_RAN' で受け取る
+//   - 手動リロードは `import { run } from "uebersicht"` でコマンドを直接実行
+//     し、結果を 'MANUAL_RESULT' イベントとして dispatch する
 // =====================================================================
 
-// --- 1. データ取得コマンド ----------------------------------------------
-//
-// なぜシェル経由か:
-//   Übersicht の `command` は外部プロセス実行で、Node 環境ではない。
-//   fetch などのブラウザ API は render 側からは使えるが、ここでは
-//   curl で済ませる方がシンプルで、Keychain アクセスとも相性が良い。
-//
-// 流れ:
-//   1) Keychain からトークンを取り出す (lib/token.sh)
-//   2) curl で Linear GraphQL API を叩く
-//   3) 標準出力に JSON をそのまま流す（render 側で JSON.parse）
-//
-// `__dirname` 相当が使えないので、Übersicht の作業ディレクトリ＝
-// ウィジェットフォルダ起点でパスを書く。
-// -----------------------------------------------------------------------
-// 全部 lib/fetch.sh に丸投げ。Übersicht の cwd は widgets フォルダなので
-// `linear-glance.widget/lib/...` でアクセスする。
-// （手動デバッグ時は widget フォルダ直下で `bash lib/fetch.sh` でも動くようフォールバック）
-export const command = "bash linear-glance.widget/lib/fetch.sh 2>/dev/null || bash lib/fetch.sh 2>/dev/null";
+import { run } from "uebersicht";
 
-// 1分ごとに自動更新（ms 単位）
-export const refreshFrequency = 60_000;
+const FETCH_CMD = "bash linear-glance.widget/lib/fetch.sh 2>/dev/null || bash lib/fetch.sh 2>/dev/null";
 
-// --- 2. ウィジェットの見た目（CSS） -------------------------------------
-//
-// 画面右上に配置する。`position: absolute` は Übersicht 側で付くので
-// `top` / `right` だけ指定すれば OK。
-// -----------------------------------------------------------------------
+export const command = FETCH_CMD;
+export const refreshFrequency = 60_000; // 1 分
+
+// --- スタイル -----------------------------------------------------------
 export const className = `
   top: 80px;
   right: 24px;
-  width: 360px;
+  width: 380px;
   max-height: 80vh;
   overflow: hidden;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
@@ -64,41 +38,79 @@ export const className = `
   -webkit-backdrop-filter: blur(20px) saturate(150%);
   border: 1px solid rgba(255,255,255,0.08);
   border-radius: 12px;
-  padding: 12px 14px;
+  padding: 10px 12px;
   box-shadow: 0 8px 24px rgba(0,0,0,0.35);
 
+  /* ヘッダー行 */
   header {
     display: flex;
     align-items: center;
-    gap: 8px;
-    margin-bottom: 10px;
-    font-weight: 600;
-    letter-spacing: 0.02em;
+    gap: 6px;
+    margin-bottom: 8px;
   }
-  header .title { flex: 1; opacity: 0.85; }
-  header button {
-    background: rgba(255,255,255,0.08);
-    border: 1px solid rgba(255,255,255,0.12);
+  header .brand { font-weight: 600; opacity: 0.85; }
+  header .status-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    box-shadow: 0 0 6px currentColor;
+  }
+  header .last-updated { font-size: 10.5px; opacity: 0.55; }
+  header .spacer { flex: 1; }
+  header .icon-btn {
+    background: none; border: none; cursor: pointer; color: #fff;
+    font-size: 13px; padding: 2px 4px; opacity: 0.7;
+  }
+  header .icon-btn:hover { opacity: 1; }
+  header .icon-btn.spinning { animation: spin 0.8s linear infinite; opacity: 1; }
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+  }
+
+  /* タブ行 */
+  .tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    padding-bottom: 6px;
+  }
+  .tabs button {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
     color: #fff;
     border-radius: 6px;
-    padding: 3px 9px;
+    padding: 3px 10px;
     font-size: 11px;
     cursor: pointer;
     font-family: inherit;
   }
-  header button.active {
-    background: rgba(94, 106, 210, 0.55); /* Linear っぽい紫 */
+  .tabs button.active {
+    background: rgba(94, 106, 210, 0.55);
     border-color: rgba(94, 106, 210, 0.9);
   }
 
+  /* プロジェクトセレクタ */
+  .project-select {
+    margin-bottom: 8px;
+  }
+  .project-select select {
+    width: 100%;
+    background: rgba(255,255,255,0.06);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 11px;
+    font-family: inherit;
+  }
+
+  /* Issue リスト */
   ul.issues {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    max-height: calc(80vh - 60px);
+    list-style: none; margin: 0; padding: 0;
+    max-height: calc(80vh - 110px);
     overflow-y: auto;
   }
-  ul.issues::-webkit-scrollbar { width: 0; } /* スクロールバー非表示 */
+  ul.issues::-webkit-scrollbar { width: 0; }
 
   li.issue {
     display: grid;
@@ -108,165 +120,171 @@ export const className = `
     border-bottom: 1px solid rgba(255,255,255,0.05);
   }
   li.issue:last-child { border-bottom: none; }
-
-  .dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    margin-top: 5px;
-  }
-  .row1 {
-    display: flex;
-    gap: 6px;
-    align-items: baseline;
-  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; }
+  .row1 { display: flex; gap: 6px; align-items: baseline; }
   .row1 a {
-    color: #fff;
-    text-decoration: none;
-    font-weight: 500;
-    flex: 1;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    color: #fff; text-decoration: none; font-weight: 500; flex: 1;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
   .row1 a:hover { text-decoration: underline; }
   .ident { opacity: 0.55; font-size: 10.5px; font-family: ui-monospace, monospace; }
   .meta {
-    opacity: 0.55;
-    font-size: 10.5px;
-    margin-top: 2px;
-    display: flex;
-    gap: 8px;
+    opacity: 0.55; font-size: 10.5px; margin-top: 2px;
+    display: flex; gap: 8px;
   }
 
   .empty, .error {
-    text-align: center;
-    padding: 24px 0;
-    opacity: 0.6;
+    text-align: center; padding: 24px 0; opacity: 0.65;
   }
   .error { color: #ff9c9c; }
 `;
 
-// --- 3. ローカル状態（タブ切替） ----------------------------------------
-//
-// Übersicht の state は (state, action) => state という形で更新する。
-// React の useReducer に近い。
-// -----------------------------------------------------------------------
+// --- state machine ------------------------------------------------------
 /**
- * Übersicht の state machine パターンでは、command の実行結果も
- * updateState を経由してくる（イベント type が "UB/COMMAND_RAN"）。
- * そのため output / error も state の一部として保持する。
- *
  * @typedef {{
- *   tab: 'mine' | 'team',
+ *   tab: 'mine' | 'team' | 'project',
+ *   projectId: string | null,
  *   output: string | null,
- *   error: any
+ *   lastUpdated: number | null,  // 成功した最後の取得時刻 (Date.now())
+ *   lastError: string | null,    // 直近のエラー文字列
+ *   refreshing: boolean,
  * }} State
  */
 /** @type {State} */
-export const initialState = { tab: "mine", output: null, error: null };
+export const initialState = {
+  tab: "mine",
+  projectId: null,
+  output: null,
+  lastUpdated: null,
+  lastError: null,
+  refreshing: false,
+};
+
+/** 取得結果(string)を state に反映する共通処理 */
+function applyOutput(prev, output, error) {
+  if (error) {
+    return { ...prev, refreshing: false, lastError: String(error) };
+  }
+  if (typeof output !== "string" || output === "") {
+    return { ...prev, refreshing: false, lastError: "EMPTY_OUTPUT" };
+  }
+  // output が JSON エラーを含んでいないか軽くチェック
+  try {
+    const j = JSON.parse(output);
+    if (j.error) {
+      return { ...prev, refreshing: false, output, lastError: j.error };
+    }
+    if (j.errors) {
+      return { ...prev, refreshing: false, output, lastError: j.errors[0]?.message || "API_ERROR" };
+    }
+    return {
+      ...prev,
+      refreshing: false,
+      output,
+      lastUpdated: Date.now(),
+      lastError: null,
+    };
+  } catch (e) {
+    return { ...prev, refreshing: false, output, lastError: "PARSE_ERROR" };
+  }
+}
 
 /** @param {any} event @param {State} prev */
 export const updateState = (event, prev) => {
-  // Übersicht が command を実行し終えたときに発火するイベント
-  if (event.type === "UB/COMMAND_RAN") {
-    return { ...prev, output: event.output, error: event.error };
+  switch (event.type) {
+    case "UB/COMMAND_RAN": // 自動更新の結果
+      return applyOutput(prev, event.output, event.error);
+    case "MANUAL_START":
+      return { ...prev, refreshing: true };
+    case "MANUAL_RESULT":
+      return applyOutput(prev, event.output, event.error);
+    case "SET_TAB":
+      return { ...prev, tab: event.tab };
+    case "SET_PROJECT":
+      return { ...prev, projectId: event.projectId };
+    default:
+      return prev;
   }
-  if (event.type === "SET_TAB") {
-    return { ...prev, tab: event.tab ?? "mine" };
-  }
-  return prev;
 };
 
-// --- 4. render ----------------------------------------------------------
-//
-// output は string（command の標準出力）。
-// state は上の initialState / updateState で管理されている。
-// dispatch を呼ぶと updateState が走り、render が再実行される。
-// -----------------------------------------------------------------------
-/**
- * @param {{output: string, error?: any}} args
- * @param {State} state
- * @param {(action: any) => void} dispatch
- */
-/**
- * state machine パターンでは render のシグネチャは (state, dispatch)。
- * @param {State} state
- * @param {(action: any) => void} dispatch
- */
+// --- render -------------------------------------------------------------
+/** @param {State} state @param {(action:any)=>void} dispatch */
 export const render = (state, dispatch) => {
-  const { output, error, tab } = state;
+  const { output, lastError, lastUpdated, refreshing, tab, projectId } = state;
 
-  if (error) return <div className="error">Übersicht error: {String(error)}</div>;
-  if (output == null) return <div className="empty">Loading…</div>;
-
-  /** @type {any} */
-  let data;
-  try {
-    data = JSON.parse(output);
-  } catch (e) {
-    const preview = String(output).slice(0, 200);
-    return <div className="error">JSON parse failed:<br />{preview}</div>;
-  }
-
-  if (data.error === "NO_TOKEN") {
+  // データ未取得 → Loading
+  if (!output && !lastError) {
     return (
-      <div className="error">
-        Keychain にトークンがありません。<br />
-        README.md のセットアップ手順を実行してください。
+      <div>
+        {renderHeader(state, dispatch)}
+        <div className="empty">Loading…</div>
       </div>
     );
   }
-  if (data.error === "NETWORK") {
-    return <div className="error">Linear に接続できませんでした（ネットワーク？）</div>;
-  }
-  if (data.errors) {
-    return <div className="error">Linear API error: {data.errors[0]?.message}</div>;
-  }
+
+  // パース
+  /** @type {any} */
+  let data = null;
+  try { data = output ? JSON.parse(output) : null; } catch { /* noop */ }
 
   const viewer = data?.data?.viewer;
-  if (!viewer) return <div className="error">viewer が取得できませんでした</div>;
 
-  // 表示する Issue 配列をタブに応じて決める
-  /** @type {any[]} */
-  let issues = [];
-  if (state.tab === "mine") {
-    issues = viewer.assignedIssues?.nodes ?? [];
-  } else {
-    // 全チームの issues を平らに結合（重複は identifier で除く）
-    const seen = new Set();
-    for (const m of viewer.teamMemberships?.nodes ?? []) {
-      for (const i of m.team?.issues?.nodes ?? []) {
-        if (seen.has(i.identifier)) continue;
-        seen.add(i.identifier);
-        issues.push(i);
-      }
-    }
-    // 更新日時の降順に並べ直す
-    issues.sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));
+  // ステータス重大エラー (NO_TOKEN, NETWORK)
+  if (data?.error === "NO_TOKEN") {
+    return (
+      <div>
+        {renderHeader(state, dispatch)}
+        <div className="error">
+          Keychain にトークンがありません。<br />
+          README.md のセットアップ手順を実行してください。
+        </div>
+      </div>
+    );
   }
+
+  // プロジェクト一覧を集約（重複排除）
+  const projects = collectProjects(viewer);
+
+  // 現在のタブに応じて表示する Issue を決める
+  const issues = pickIssues(viewer, tab, projectId);
 
   return (
     <div>
-      <header>
-        <span className="title">Linear</span>
-        <button
-          className={state.tab === "mine" ? "active" : ""}
-          onClick={() => dispatch({ type: "SET_TAB", tab: "mine" })}
-        >
-          Mine ({viewer.assignedIssues?.nodes?.length ?? 0})
-        </button>
-        <button
-          className={state.tab === "team" ? "active" : ""}
-          onClick={() => dispatch({ type: "SET_TAB", tab: "team" })}
-        >
+      {renderHeader(state, dispatch, { mineCount: viewer?.assignedIssues?.nodes?.length })}
+
+      <div className="tabs">
+        <TabButton active={tab === "mine"} onClick={() => dispatch({ type: "SET_TAB", tab: "mine" })}>
+          Mine{viewer?.assignedIssues?.nodes ? ` (${viewer.assignedIssues.nodes.length})` : ""}
+        </TabButton>
+        <TabButton active={tab === "team"} onClick={() => dispatch({ type: "SET_TAB", tab: "team" })}>
           Team
-        </button>
-      </header>
+        </TabButton>
+        <TabButton active={tab === "project"} onClick={() => dispatch({ type: "SET_TAB", tab: "project" })}>
+          Project
+        </TabButton>
+      </div>
+
+      {tab === "project" && (
+        <div className="project-select">
+          <select
+            value={projectId || ""}
+            onChange={(e) => dispatch({ type: "SET_PROJECT", projectId: e.target.value || null })}
+          >
+            <option value="">— プロジェクトを選択 —</option>
+            {projects.map((p) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {issues.length === 0 ? (
         <div className="empty">
-          {state.tab === "mine" ? "👏 自分担当の未完了 Issue はありません" : "Issue がありません"}
+          {tab === "project" && !projectId
+            ? "上のセレクタからプロジェクトを選んでください"
+            : tab === "mine"
+              ? "👏 自分担当の未完了 Issue はありません"
+              : "Issue がありません"}
         </div>
       ) : (
         <ul className="issues">
@@ -281,7 +299,7 @@ export const render = (state, dispatch) => {
                 <div className="meta">
                   <span>{issue.state?.name}</span>
                   {issue.project?.name && <span>· {issue.project.name}</span>}
-                  {state.tab === "team" && issue.assignee?.displayName && (
+                  {(tab === "team" || tab === "project") && issue.assignee?.displayName && (
                     <span>· {issue.assignee.displayName}</span>
                   )}
                   <span>· {formatRelative(issue.updatedAt)}</span>
@@ -295,11 +313,104 @@ export const render = (state, dispatch) => {
   );
 };
 
-// --- 5. ユーティリティ ---------------------------------------------------
+// --- ヘッダー描画（タイトル + ステータスドット + 時刻 + リロード） ---------
+function renderHeader(state, dispatch) {
+  const { lastUpdated, lastError, refreshing } = state;
+  const statusColor = getStatusColor(lastUpdated, lastError);
+  const statusTitle = lastError
+    ? `エラー: ${lastError}`
+    : lastUpdated
+      ? `最終更新 ${formatTime(lastUpdated)}`
+      : "未取得";
+
+  const handleRefresh = () => {
+    dispatch({ type: "MANUAL_START" });
+    run(FETCH_CMD)
+      .then((stdout) => dispatch({ type: "MANUAL_RESULT", output: String(stdout) }))
+      .catch((err) => dispatch({ type: "MANUAL_RESULT", error: err }));
+  };
+
+  return (
+    <header>
+      <span className="brand">Linear</span>
+      <span className="status-dot" style={{ background: statusColor, color: statusColor }} title={statusTitle} />
+      <span className="last-updated">{lastUpdated ? formatTime(lastUpdated) : "—"}</span>
+      <span className="spacer" />
+      <button
+        className={"icon-btn" + (refreshing ? " spinning" : "")}
+        onClick={handleRefresh}
+        title="リロード"
+      >
+        ↻
+      </button>
+    </header>
+  );
+}
+
+// --- ヘルパー -----------------------------------------------------------
+function getStatusColor(lastUpdated, lastError) {
+  if (lastError) return "#ff6b6b"; // 赤
+  if (!lastUpdated) return "#999";  // グレー（未取得）
+  const age = Date.now() - lastUpdated;
+  if (age > refreshFrequency * 2) return "#f4c542"; // 黄
+  return "#4ade80"; // 緑
+}
+
 /**
- * ISO日時を「3h ago」みたいな相対表記に変換。依存ライブラリを足したくないので自前。
- * @param {string} iso
+ * プロジェクト一覧を Issue から集める。
+ * GraphQL の複雑度制限を避けるため projects フィールドは取らず、
+ * 「アクティブな Issue を持つプロジェクト」だけを表示する方針。
+ * 実用上、Issue が無いプロジェクトは選んでも空なので問題なし。
  */
+function collectProjects(viewer) {
+  if (!viewer) return [];
+  const map = new Map();
+  // 自分のアサインから
+  for (const i of viewer.assignedIssues?.nodes ?? []) {
+    if (i.project && !map.has(i.project.id)) map.set(i.project.id, i.project);
+  }
+  // チームの Issue から
+  for (const m of viewer.teamMemberships?.nodes ?? []) {
+    for (const i of m.team?.issues?.nodes ?? []) {
+      if (i.project && !map.has(i.project.id)) map.set(i.project.id, i.project);
+    }
+  }
+  return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function pickIssues(viewer, tab, projectId) {
+  if (!viewer) return [];
+  if (tab === "mine") {
+    return viewer.assignedIssues?.nodes ?? [];
+  }
+  // Team と Project は teamMemberships.team.issues を平らに結合
+  const seen = new Set();
+  /** @type {any[]} */
+  const all = [];
+  for (const m of viewer.teamMemberships?.nodes ?? []) {
+    for (const i of m.team?.issues?.nodes ?? []) {
+      if (seen.has(i.identifier)) continue;
+      seen.add(i.identifier);
+      all.push(i);
+    }
+  }
+  if (tab === "project") {
+    if (!projectId) return [];
+    return all.filter((i) => i.project?.id === projectId)
+              .sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));
+  }
+  return all.sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));
+}
+
+function TabButton({ active, onClick, children }) {
+  return (
+    <button className={active ? "active" : ""} onClick={onClick}>
+      {children}
+    </button>
+  );
+}
+
+/** ISO日時 → "3h ago" 形式 */
 function formatRelative(iso) {
   const t = new Date(iso).getTime();
   if (Number.isNaN(t)) return "";
@@ -309,4 +420,12 @@ function formatRelative(iso) {
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
   if (diff < 86400 * 30) return `${Math.floor(diff / 86400)}d ago`;
   return new Date(iso).toLocaleDateString();
+}
+
+/** timestamp(ms) → "13:42" */
+function formatTime(ms) {
+  const d = new Date(ms);
+  const h = String(d.getHours()).padStart(2, "0");
+  const m = String(d.getMinutes()).padStart(2, "0");
+  return `${h}:${m}`;
 }

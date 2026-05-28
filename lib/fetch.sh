@@ -38,11 +38,11 @@ query {
   viewer {
     id
     name
-    assignedIssues(filter: { state: { type: { neq: "completed" } } }, first: 30, orderBy: updatedAt) {
+    assignedIssues(filter: { state: { type: { neq: "completed" } } }, first: 50, orderBy: updatedAt) {
       nodes {
         identifier title url updatedAt
         state { name color type }
-        project { name }
+        project { id name }
         team { key }
       }
     }
@@ -54,7 +54,7 @@ query {
             nodes {
               identifier title url updatedAt
               state { name color type }
-              project { name }
+              project { id name color }
               assignee { displayName }
             }
           }
