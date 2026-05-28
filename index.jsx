@@ -36,16 +36,10 @@
 // `__dirname` 相当が使えないので、Übersicht の作業ディレクトリ＝
 // ウィジェットフォルダ起点でパスを書く。
 // -----------------------------------------------------------------------
-export const command = `
-  TOKEN=$(bash linear-glance.widget/lib/token.sh 2>/dev/null) || \
-  TOKEN=$(bash lib/token.sh 2>/dev/null) || { echo '{"error":"NO_TOKEN"}'; exit 0; }
-
-  curl -sS https://api.linear.app/graphql \
-    -H "Authorization: $TOKEN" \
-    -H "Content-Type: application/json" \
-    --data '{"query":"query{viewer{id name assignedIssues(filter:{state:{type:{neq:\\"completed\\"}}},first:30,orderBy:updatedAt){nodes{identifier title url updatedAt state{name color type} project{name} team{key}}} teamMemberships{nodes{team{id key name issues(filter:{state:{type:{neq:\\"completed\\"}}},first:30,orderBy:updatedAt){nodes{identifier title url updatedAt state{name color type} project{name} assignee{displayName}}}}}}}}"}' \
-    || echo '{"error":"NETWORK"}'
-`;
+// 全部 lib/fetch.sh に丸投げ。Übersicht の cwd は widgets フォルダなので
+// `linear-glance.widget/lib/...` でアクセスする。
+// （手動デバッグ時は widget フォルダ直下で `bash lib/fetch.sh` でも動くようフォールバック）
+export const command = "bash linear-glance.widget/lib/fetch.sh 2>/dev/null || bash lib/fetch.sh 2>/dev/null";
 
 // 1分ごとに自動更新（ms 単位）
 export const refreshFrequency = 60_000;
