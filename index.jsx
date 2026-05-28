@@ -183,15 +183,24 @@ export const updateState = (action, prev) => {
  * @param {State} state
  * @param {(action: any) => void} dispatch
  */
-export const render = ({ output, error }, state, dispatch) => {
+export const render = (props, state, dispatch) => {
+  // Übersicht は初回 render 時 output が undefined のことがある（コマンド実行前）。
+  // また command が非0終了したときも output が来ない場合があるので防御的に扱う。
+  const output = props?.output;
+  const error = props?.error;
+
   if (error) return <div className="error">Übersicht error: {String(error)}</div>;
+  if (output == null || output === "") {
+    return <div className="empty">Loading…</div>;
+  }
 
   /** @type {any} */
   let data;
   try {
     data = JSON.parse(output);
   } catch (e) {
-    return <div className="error">JSON parse failed:<br />{output.slice(0, 200)}</div>;
+    const preview = String(output).slice(0, 200);
+    return <div className="error">JSON parse failed:<br />{preview}</div>;
   }
 
   if (data.error === "NO_TOKEN") {
