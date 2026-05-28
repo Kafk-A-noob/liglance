@@ -10,12 +10,24 @@
 
 set -u  # 未定義変数だけ厳しく。-e は使わない（フォールバックを自分で書くため）
 
+# デバッグログ（Übersicht の bash 環境で何が起きているか後から確認できるように）
+LOG=/tmp/linear-glance.log
+{
+  echo "--- $(date '+%H:%M:%S') ---"
+  echo "PATH=$PATH"
+  echo "cwd=$(pwd)"
+  echo "script=$0"
+} >>"$LOG" 2>&1
+
 # このスクリプトと同じディレクトリ
 DIR="$(cd "$(dirname "$0")" && pwd)"
+echo "DIR=$DIR" >>"$LOG"
 
 # 1. Keychain からトークン取得
-TOKEN=$(bash "$DIR/token.sh" 2>/dev/null)
+TOKEN=$(bash "$DIR/token.sh" 2>>"$LOG")
+echo "TOKEN_LEN=${#TOKEN}" >>"$LOG"
 if [ -z "${TOKEN:-}" ]; then
+  echo "no token, exiting" >>"$LOG"
   echo '{"error":"NO_TOKEN"}'
   exit 0
 fi
@@ -53,16 +65,25 @@ query {
 }
 GRAPHQL
 
-# 3. JSON ボディを安全に組み立て（jq が無くても動くように printf で）
-#    クエリ内の改行を \n に、ダブルクォートを \" に置換
-ESCAPED=$(printf '%s' "$QUERY" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')
-BODY="{\"query\":$ESCAPED}"
+# 3. クエリをファイルに書き出し、curl の --data-urlencode で送る
+#    （python3 / jq に依存しない＝Übersicht の最小 PATH でも動く）
+TMP=$(mktemp -t linear-glance.XXXXXX)
+trap 'rm -f "$TMP"' EXIT
+# 改行を空白に圧縮してから JSON 文字列として渡す
+COMPACT=$(printf '%s' "$QUERY" | tr '\n' ' ')
 
-# 4. curl 実行。失敗時もエラーJSONを返す
+# 4. curl 実行。--data-urlencode を使えばシェルエスケープ不要
+#    ただし GraphQL は JSON ボディ必須なので、自前でエスケープ：
+#      " → \"  だけやれば充分（クエリ中にバックスラッシュは無いことが前提）
+ESCAPED=$(printf '%s' "$COMPACT" | sed 's/"/\\"/g')
+BODY="{\"query\":\"$ESCAPED\"}"
+
 RESPONSE=$(curl -sS --max-time 10 https://api.linear.app/graphql \
   -H "Authorization: $TOKEN" \
   -H "Content-Type: application/json" \
-  --data "$BODY" 2>/dev/null)
+  --data "$BODY" 2>>"$LOG")
+
+echo "RESPONSE_LEN=${#RESPONSE}" >>"$LOG"
 
 if [ -z "$RESPONSE" ]; then
   echo '{"error":"NETWORK"}'

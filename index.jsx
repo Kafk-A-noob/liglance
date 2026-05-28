@@ -152,18 +152,30 @@ export const className = `
 // Übersicht の state は (state, action) => state という形で更新する。
 // React の useReducer に近い。
 // -----------------------------------------------------------------------
-/** @typedef {{ tab: 'mine' | 'team' }} State */
+/**
+ * Übersicht の state machine パターンでは、command の実行結果も
+ * updateState を経由してくる（イベント type が "UB/COMMAND_RAN"）。
+ * そのため output / error も state の一部として保持する。
+ *
+ * @typedef {{
+ *   tab: 'mine' | 'team',
+ *   output: string | null,
+ *   error: any
+ * }} State
+ */
 /** @type {State} */
-export const initialState = { tab: "mine" };
+export const initialState = { tab: "mine", output: null, error: null };
 
-/** @param {{type:string, tab?:'mine'|'team'}} action @param {State} prev */
-export const updateState = (action, prev) => {
-  switch (action.type) {
-    case "SET_TAB":
-      return { ...prev, tab: action.tab ?? "mine" };
-    default:
-      return prev;
+/** @param {any} event @param {State} prev */
+export const updateState = (event, prev) => {
+  // Übersicht が command を実行し終えたときに発火するイベント
+  if (event.type === "UB/COMMAND_RAN") {
+    return { ...prev, output: event.output, error: event.error };
   }
+  if (event.type === "SET_TAB") {
+    return { ...prev, tab: event.tab ?? "mine" };
+  }
+  return prev;
 };
 
 // --- 4. render ----------------------------------------------------------
@@ -177,16 +189,16 @@ export const updateState = (action, prev) => {
  * @param {State} state
  * @param {(action: any) => void} dispatch
  */
-export const render = (props, state, dispatch) => {
-  // Übersicht は初回 render 時 output が undefined のことがある（コマンド実行前）。
-  // また command が非0終了したときも output が来ない場合があるので防御的に扱う。
-  const output = props?.output;
-  const error = props?.error;
+/**
+ * state machine パターンでは render のシグネチャは (state, dispatch)。
+ * @param {State} state
+ * @param {(action: any) => void} dispatch
+ */
+export const render = (state, dispatch) => {
+  const { output, error, tab } = state;
 
   if (error) return <div className="error">Übersicht error: {String(error)}</div>;
-  if (output == null || output === "") {
-    return <div className="empty">Loading…</div>;
-  }
+  if (output == null) return <div className="empty">Loading…</div>;
 
   /** @type {any} */
   let data;
