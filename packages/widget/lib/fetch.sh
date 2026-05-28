@@ -10,24 +10,12 @@
 
 set -u  # 未定義変数だけ厳しく。-e は使わない（フォールバックを自分で書くため）
 
-# デバッグログ（Übersicht の bash 環境で何が起きているか後から確認できるように）
-LOG=/tmp/liglance.log
-{
-  echo "--- $(date '+%H:%M:%S') ---"
-  echo "PATH=$PATH"
-  echo "cwd=$(pwd)"
-  echo "script=$0"
-} >>"$LOG" 2>&1
-
 # このスクリプトと同じディレクトリ
 DIR="$(cd "$(dirname "$0")" && pwd)"
-echo "DIR=$DIR" >>"$LOG"
 
 # 1. Keychain からトークン取得
-TOKEN=$(bash "$DIR/token.sh" 2>>"$LOG")
-echo "TOKEN_LEN=${#TOKEN}" >>"$LOG"
+TOKEN=$(bash "$DIR/token.sh" 2>/dev/null)
 if [ -z "${TOKEN:-}" ]; then
-  echo "no token, exiting" >>"$LOG"
   echo '{"error":"NO_TOKEN"}'
   exit 0
 fi
@@ -81,9 +69,7 @@ BODY="{\"query\":\"$ESCAPED\"}"
 RESPONSE=$(curl -sS --max-time 10 https://api.linear.app/graphql \
   -H "Authorization: $TOKEN" \
   -H "Content-Type: application/json" \
-  --data "$BODY" 2>>"$LOG")
-
-echo "RESPONSE_LEN=${#RESPONSE}" >>"$LOG"
+  --data "$BODY" 2>/dev/null)
 
 if [ -z "$RESPONSE" ]; then
   echo '{"error":"NETWORK"}'

@@ -12,6 +12,24 @@ export function formatRelative(iso: string): string {
   return new Date(iso).toLocaleDateString();
 }
 
+/**
+ * 文字列から代表的なシークレット形式を *** で塗り潰す。
+ * UI にエラーメッセージを生表示するとき、ライブラリが
+ * Authorization ヘッダなどをログ出力に混入させていた場合の保険。
+ */
+export function redactSecrets(s: string): string {
+  return s
+    .replace(/lin_api_[A-Za-z0-9]{10,}/g, "lin_api_***REDACTED***")
+    .replace(/lin_oauth_[A-Za-z0-9]{10,}/g, "lin_oauth_***REDACTED***")
+    .replace(/sk-[A-Za-z0-9_-]{20,}/g, "sk-***REDACTED***")
+    .replace(/gh[pous]_[A-Za-z0-9]{20,}/g, "gh_***REDACTED***")
+    .replace(/xox[baprs]-[A-Za-z0-9-]{10,}/g, "xoxX-***REDACTED***")
+    .replace(
+      /eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g,
+      "JWT_***REDACTED***"
+    );
+}
+
 /** timestamp(ms) → "MM/DD HH:mm" 形式で常に日付付き */
 export function formatTime(ms: number): string {
   const d = new Date(ms);

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { tokenExists, saveToken, fetchLinear } from "./api";
 import type { Issue, LinearResponse, Project, Tab, Viewer } from "./types";
-import { formatRelative, formatTime } from "./utils";
+import { formatRelative, formatTime, redactSecrets } from "./utils";
 import "./App.css";
 
 const REFRESH_INTERVAL_MS = 60_000;
@@ -121,7 +121,7 @@ function Dashboard() {
 
   const statusColor = getStatusColor(lastUpdated, lastError);
   const statusTitle = lastError
-    ? `エラー: ${lastError}`
+    ? `エラー: ${redactSecrets(lastError)}`
     : lastUpdated
     ? `最終更新 ${formatTime(lastUpdated)}`
     : "未取得";
@@ -180,7 +180,7 @@ function Dashboard() {
       {lastError && !viewer ? (
         <div className="error" style={{ textAlign: "left", padding: "12px 4px", fontSize: 11, wordBreak: "break-all" }}>
           <b>エラー:</b><br />
-          {lastError}
+          {redactSecrets(lastError)}
         </div>
       ) : (
         <IssueList tab={tab} projectId={projectId} issues={issues} />
