@@ -3,6 +3,8 @@ name = "liglance"
 version = "0.1.0"
 description = "LiGlance — Linear issues Glance, menubar app for macOS"
 authors = ["Kafk-A-noob"]
+license = "MIT"
+repository = "https://github.com/Kafk-A-noob/liglance"
 edition = "2021"
 
 [lib]
