@@ -2,7 +2,7 @@
 name = "liglance"
 version = "0.1.0"
 description = "LiGlance — Linear issues Glance, menubar app for macOS"
-authors = ["n.masaru"]
+authors = ["Kafk-A-noob"]
 edition = "2021"
 
 [lib]

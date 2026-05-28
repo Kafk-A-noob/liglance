@@ -48,7 +48,7 @@ security add-generic-password \
 ### 4. Übersicht の widgets フォルダにシンボリックリンクを張る
 
 ```bash
-ln -s /Users/n.masaru/pri/liglance \
+ln -s $HOME/path/to/liglance \
   "$HOME/Library/Application Support/Übersicht/widgets/liglance.widget"
 ```
 
