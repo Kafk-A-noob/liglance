@@ -24,3 +24,8 @@ tokio = { version = "1", features = ["full"] }
 reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
 # トレイアイコン用に埋め込んだ PNG をデコードする
 image = { version = "0.25", default-features = false, features = ["png"] }
+
+# macOS 以外は Keychain アクセスに keyring crate を使う
+# (macOS は dev ビルドの ACL 問題回避のため shell 経由の security CLI を使う)
+[target.'cfg(not(target_os = "macos"))'.dependencies]
+keyring = "3"
