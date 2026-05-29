@@ -109,13 +109,25 @@ fn read_token() -> Result<String, String> {
 - テーマ切替（light / dark / 自動）
 - 設定 UI（refreshFrequency などをアプリ内で変えられるように）
 
-## 編集機能の分担
+## 機能パリティ（2 アプリの差分）
 
-- **Tauri 版**: ステータス更新・編集モード ON/OFF・将来的なフィルタなど **編集機能はこちらに集中**
-- **Übersicht 版**: 「常に視界に入る」用途に振り切って **read-only**（壁紙レイヤーで編集 UI を出すと操作が辛い）
+| 機能 | Tauri (menubar) | Übersicht (widget) |
+|---|---|---|
+| Issue 一覧 (Mine / Team / Project) | ✅ | ✅ |
+| 接続ステータス / 最終更新 / リロード | ✅ | ✅ |
+| 優先度バッジ + 優先度順ソート | ✅ | ✅ |
+| Done / Canceled / Backlog / In Review トグル | ✅ | ✅ |
+| 編集モード + ステータス更新 | ✅ | ✅ |
+| クリックで外部ブラウザ | ✅ Rust 経由 | ✅ WebKit 既存挙動 |
+| **ドラッグで位置移動** | — | ✅ widget 独自 |
+| **メニューバー常駐 + クリックで最前面** | ✅ | — |
+| **デスクトップ常駐（壁紙レイヤー）** | — | ✅ |
 
-Übersicht 版でステータス変更したい場合は Tauri 版を開いて操作してください。
-両者は同じ Keychain トークンを共有しているので、API 経由で同じ結果が得られます。
+実装の違い:
+- Tauri 版は GraphQL 呼び出しを Rust 側で行う（CORS 回避、トークン非露出）
+- Übersicht 版はシェルスクリプト (`fetch.sh` / `fetch-states.sh` / `update-state.sh`) で `security` CLI と `curl` を経由
+
+両アプリは **macOS Keychain (`linear-widget-token`)** を共有するので、片方でトークン保存すれば両方使える。
 
 ## やらないこと（明示）
 

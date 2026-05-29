@@ -167,15 +167,25 @@ header .icon-btn.spinning {
   background: rgba(94, 106, 210, 0.55);
   border-color: rgba(94, 106, 210, 0.9);
 }
-.tabs .tabs-spacer { flex: 1; }
-.tabs .filter-chip {
-  font-size: 10px;
-  padding: 2px 7px;
-  opacity: 0.55;
-  background: transparent;
-  border: 1px dashed rgba(255, 255, 255, 0.2);
+/* 状態フィルタ行（タブの下） */
+.filter-row {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
 }
-.tabs .filter-chip.active {
+.filter-chip {
+  background: transparent;
+  border: 1px dashed rgba(255,255,255,0.2);
+  color: #fff;
+  border-radius: 6px;
+  padding: 2px 7px;
+  font-size: 10px;
+  cursor: pointer;
+  font-family: inherit;
+  opacity: 0.55;
+}
+.filter-chip.active {
   opacity: 1;
   background: rgba(80, 200, 120, 0.25);
   border-color: rgba(80, 200, 120, 0.7);

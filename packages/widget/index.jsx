@@ -152,15 +152,25 @@ export const className = `
     background: rgba(94, 106, 210, 0.55);
     border-color: rgba(94, 106, 210, 0.9);
   }
-  .tabs .tabs-spacer { flex: 1; }
-  .tabs .filter-chip {
-    font-size: 10px;
-    padding: 2px 7px;
-    opacity: 0.55;
+  /* 状態フィルタ行 */
+  .filter-row {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+  }
+  .filter-chip {
     background: transparent;
     border: 1px dashed rgba(255,255,255,0.2);
+    color: #fff;
+    border-radius: 6px;
+    padding: 2px 7px;
+    font-size: 10px;
+    cursor: pointer;
+    font-family: inherit;
+    opacity: 0.55;
   }
-  .tabs .filter-chip.active {
+  .filter-chip.active {
     opacity: 1;
     background: rgba(80,200,120,0.25);
     border-color: rgba(80,200,120,0.7);
@@ -305,9 +315,12 @@ export const initialState = {
   lastUpdated: null,
   lastError: null,
   refreshing: false,
-  // 完了・キャンセル issues の表示制御。デフォルトは非表示（Tauri 版と揃える）
+  // 状態フィルタ。Done/Canceled は noise なのでデフォルト OFF、
+  // Backlog/InReview は通常作業なのでデフォルト ON
   showDone: loadBool("liglance.showDone", false),
   showCanceled: loadBool("liglance.showCanceled", false),
+  showBacklog: loadBool("liglance.showBacklog", true),
+  showInReview: loadBool("liglance.showInReview", true),
   // 編集モード: ON でステータス変更可。誤クリック防止のためデフォルト OFF
   editMode: loadBool("liglance.editMode", false),
   /** @type {Record<string, Array<{id:string,name:string,color:string,type:string,position?:number}>>} */
@@ -364,6 +377,12 @@ export const updateState = (event, prev) => {
     case "SET_SHOW_CANCELED":
       try { localStorage.setItem("liglance.showCanceled", String(event.value)); } catch {}
       return { ...prev, showCanceled: event.value };
+    case "SET_SHOW_BACKLOG":
+      try { localStorage.setItem("liglance.showBacklog", String(event.value)); } catch {}
+      return { ...prev, showBacklog: event.value };
+    case "SET_SHOW_INREVIEW":
+      try { localStorage.setItem("liglance.showInReview", String(event.value)); } catch {}
+      return { ...prev, showInReview: event.value };
     case "SET_EDIT_MODE":
       try { localStorage.setItem("liglance.editMode", String(event.value)); } catch {}
       return { ...prev, editMode: event.value };
@@ -416,7 +435,7 @@ function changeIssueState(dispatch, issueId, stateId) {
 }
 
 export const render = (state, dispatch) => {
-  const { output, lastError, lastUpdated, refreshing, tab, projectId, showDone, showCanceled, editMode, statesByTeam, updatingIssueId } = state;
+  const { output, lastError, lastUpdated, refreshing, tab, projectId, showDone, showCanceled, showBacklog, showInReview, editMode, statesByTeam, updatingIssueId } = state;
 
   // 編集モード ON で states 未取得なら fetch
   if (editMode && Object.keys(statesByTeam).length === 0) {
@@ -457,7 +476,7 @@ export const render = (state, dispatch) => {
   const projects = collectProjects(viewer);
 
   // 現在のタブに応じて表示する Issue を決める
-  const issues = pickIssues(viewer, tab, projectId, showDone, showCanceled);
+  const issues = pickIssues(viewer, tab, projectId, { showDone, showCanceled, showBacklog, showInReview });
 
   return (
     <div>
@@ -473,7 +492,16 @@ export const render = (state, dispatch) => {
         <TabButton active={tab === "project"} onClick={() => dispatch({ type: "SET_TAB", tab: "project" })}>
           Project
         </TabButton>
-        <span className="tabs-spacer" />
+      </div>
+
+      {/* 状態フィルタ: 4 つ並べる */}
+      <div className="filter-row">
+        <FilterChip active={showBacklog} onClick={() => dispatch({ type: "SET_SHOW_BACKLOG", value: !showBacklog })} title="Backlog を表示">
+          📋 BL
+        </FilterChip>
+        <FilterChip active={showInReview} onClick={() => dispatch({ type: "SET_SHOW_INREVIEW", value: !showInReview })} title="In Review を表示">
+          👁 Rev
+        </FilterChip>
         <FilterChip active={showDone} onClick={() => dispatch({ type: "SET_SHOW_DONE", value: !showDone })} title="Done を表示">
           ✓ Done
         </FilterChip>
@@ -642,20 +670,28 @@ function sortByPriorityThenUpdated(a, b) {
   return a.updatedAt < b.updatedAt ? 1 : -1;
 }
 
-/** showDone/showCanceled に応じて state.type で除外 */
-function filterByStateType(issues, showDone, showCanceled) {
+/**
+ * 状態フィルタ。
+ *  - Done(completed) / Canceled / Backlog は state.type で判定
+ *  - In Review は state.name に "review" を含むかで判定（type=started の一部のため）
+ */
+function filterByState(issues, opts) {
+  const { showDone, showCanceled, showBacklog, showInReview } = opts;
   return issues.filter((i) => {
     const t = i.state?.type;
+    const name = (i.state?.name || "").toLowerCase();
     if (t === "completed" && !showDone) return false;
     if (t === "canceled" && !showCanceled) return false;
+    if (t === "backlog" && !showBacklog) return false;
+    if (!showInReview && name.includes("review")) return false;
     return true;
   });
 }
 
-function pickIssues(viewer, tab, projectId, showDone, showCanceled) {
+function pickIssues(viewer, tab, projectId, filterOpts) {
   if (!viewer) return [];
   if (tab === "mine") {
-    return filterByStateType(viewer.assignedIssues?.nodes ?? [], showDone, showCanceled)
+    return filterByState(viewer.assignedIssues?.nodes ?? [], filterOpts)
       .slice()
       .sort(sortByPriorityThenUpdated);
   }
@@ -668,7 +704,7 @@ function pickIssues(viewer, tab, projectId, showDone, showCanceled) {
       all.push(i);
     }
   }
-  const filtered = filterByStateType(all, showDone, showCanceled);
+  const filtered = filterByState(all, filterOpts);
   if (tab === "project") {
     if (!projectId) return [];
     return filtered.filter((i) => i.project?.id === projectId).sort(sortByPriorityThenUpdated);

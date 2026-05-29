@@ -111,6 +111,19 @@ function Dashboard() {
     try { return localStorage.getItem("liglance.showCanceled") === "true"; }
     catch { return false; }
   });
+  // Backlog と In Review は通常作業の一部なのでデフォルト ON
+  const [showBacklog, setShowBacklog] = useState<boolean>(() => {
+    try {
+      const v = localStorage.getItem("liglance.showBacklog");
+      return v === null ? true : v === "true";
+    } catch { return true; }
+  });
+  const [showInReview, setShowInReview] = useState<boolean>(() => {
+    try {
+      const v = localStorage.getItem("liglance.showInReview");
+      return v === null ? true : v === "true";
+    } catch { return true; }
+  });
   // ステータス変更中の issue id（更新中スピナー用）
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   // 別 fetch で取得した states マップ（編集モード ON 時のみ取得）
@@ -121,10 +134,11 @@ function Dashboard() {
   const refresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      // 「表示しない」もの = excludeTypes として API に送る
+      // 「表示しない」もの = excludeTypes として API に送る (type ベース)
       const excludeTypes: string[] = [];
       if (!showDone) excludeTypes.push("completed");
       if (!showCanceled) excludeTypes.push("canceled");
+      if (!showBacklog) excludeTypes.push("backlog");
 
       const res = await fetchLinear(excludeTypes);
       setData(res);
@@ -139,7 +153,7 @@ function Dashboard() {
     } finally {
       setRefreshing(false);
     }
-  }, [showDone, showCanceled]);
+  }, [showDone, showCanceled, showBacklog]);
 
   useEffect(() => {
     refresh();
@@ -177,12 +191,37 @@ function Dashboard() {
       return next;
     });
   };
+  const toggleShowBacklog = () => {
+    setShowBacklog((v) => {
+      const next = !v;
+      try { localStorage.setItem("liglance.showBacklog", String(next)); } catch {}
+      return next;
+    });
+  };
+  const toggleShowInReview = () => {
+    setShowInReview((v) => {
+      const next = !v;
+      try { localStorage.setItem("liglance.showInReview", String(next)); } catch {}
+      return next;
+    });
+  };
 
   const viewer: Viewer | null = data?.data?.viewer ?? null;
   const projects = useMemo(() => collectProjects(viewer), [viewer]);
   const issues = useMemo(
-    () => pickIssues(viewer, tab, projectId),
-    [viewer, tab, projectId]
+    () => {
+      const list = pickIssues(viewer, tab, projectId);
+      // In Review はクライアント側フィルタ（state.name に "review" 含む、case-insensitive）
+      // type ベースでは "started" 全体になってしまい、In Progress も巻き込むため
+      if (!showInReview) {
+        return list.filter((i) => {
+          const name = i.state?.name?.toLowerCase() ?? "";
+          return !name.includes("review");
+        });
+      }
+      return list;
+    },
+    [viewer, tab, projectId, showInReview]
   );
   const toggleEdit = () => {
     setEditMode((v) => {
@@ -252,7 +291,16 @@ function Dashboard() {
         <TabButton active={tab === "project"} onClick={() => setTab("project")}>
           Project
         </TabButton>
-        <span className="tabs-spacer" />
+      </div>
+
+      {/* 状態フィルタ: 別行で 4 つ並べる（タブ行が混雑するため） */}
+      <div className="filter-row">
+        <FilterChip active={showBacklog} onClick={toggleShowBacklog} title="Backlog を表示">
+          📋 BL
+        </FilterChip>
+        <FilterChip active={showInReview} onClick={toggleShowInReview} title="In Review を表示">
+          👁 Rev
+        </FilterChip>
         <FilterChip active={showDone} onClick={toggleShowDone} title="Done を表示">
           ✓ Done
         </FilterChip>
