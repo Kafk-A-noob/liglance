@@ -145,17 +145,44 @@ header .icon-btn.spinning {
   to { transform: rotate(360deg); }
 }
 
-/* --- コントロール行（タブ select + チップ） ------------------------- */
+/* --- Row 1: タブ select + （Project 時）プロジェクトセレクタ -------- */
 .controls-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+/* --- Row 2: 状態フィルタ（右寄せ） ---------------------------------- */
+.filter-row {
   display: flex;
   align-items: center;
   gap: 4px;
   margin-bottom: 8px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   padding-bottom: 6px;
-  flex-wrap: wrap;
 }
-.controls-row .controls-spacer { flex: 1; }
+.filter-row .controls-spacer { flex: 1; }
+
+/* インラインのプロジェクトセレクタ（Row 1 で tab-select の右に並ぶ） */
+.project-select-inline {
+  flex: 1; /* 残り幅いっぱい */
+  min-width: 0;
+  background-color: rgba(255, 255, 255, 0.06);
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 5' fill='white'><polygon points='0,0 8,0 4,5'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 7px 4px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #fff;
+  border-radius: 6px;
+  padding: 3px 22px 3px 10px;
+  font-size: 11px;
+  font-family: inherit;
+  appearance: none;
+  -webkit-appearance: none;
+}
+.project-select-inline:focus { outline: none; }
 
 .tab-select {
   background-color: rgba(94, 106, 210, 0.55);
@@ -193,18 +220,7 @@ header .icon-btn.spinning {
   border-style: solid;
 }
 
-/* --- プロジェクトセレクタ ------------------------------------------- */
-.project-select { margin-bottom: 8px; }
-.project-select select {
-  width: 100%;
-  background: rgba(255, 255, 255, 0.06);
-  color: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 6px;
-  padding: 4px 8px;
-  font-size: 11px;
-  font-family: inherit;
-}
+/* (旧 .project-select は project-select-inline に置換、削除) */
 
 /* --- Issue リスト --------------------------------------------------- */
 ul.issues {

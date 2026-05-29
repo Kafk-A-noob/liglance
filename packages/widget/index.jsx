@@ -130,17 +130,43 @@ export const className = `
     to   { transform: rotate(360deg); }
   }
 
-  /* コントロール行（タブ select + チップ） */
+  /* Row 1: タブ + （Project 時）プロジェクトセレクタ */
   .controls-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
+  }
+  /* Row 2: 状態フィルタ（右寄せ） */
+  .filter-row {
     display: flex;
     align-items: center;
     gap: 4px;
     margin-bottom: 8px;
     border-bottom: 1px solid rgba(255,255,255,0.08);
     padding-bottom: 6px;
-    flex-wrap: wrap;
   }
-  .controls-row .controls-spacer { flex: 1; }
+  .filter-row .controls-spacer { flex: 1; }
+
+  /* インラインのプロジェクトセレクタ */
+  .project-select-inline {
+    flex: 1;
+    min-width: 0;
+    background-color: rgba(255,255,255,0.06);
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 5' fill='white'><polygon points='0,0 8,0 4,5'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    background-size: 7px 4px;
+    border: 1px solid rgba(255,255,255,0.12);
+    color: #fff;
+    border-radius: 6px;
+    padding: 3px 22px 3px 10px;
+    font-size: 11px;
+    font-family: inherit;
+    appearance: none;
+    -webkit-appearance: none;
+  }
+  .project-select-inline:focus { outline: none; }
 
   .tab-select {
     background-color: rgba(94, 106, 210, 0.55);
@@ -178,20 +204,7 @@ export const className = `
     border-style: solid;
   }
 
-  /* プロジェクトセレクタ */
-  .project-select {
-    margin-bottom: 8px;
-  }
-  .project-select select {
-    width: 100%;
-    background: rgba(255,255,255,0.06);
-    color: #fff;
-    border: 1px solid rgba(255,255,255,0.12);
-    border-radius: 6px;
-    padding: 4px 8px;
-    font-size: 11px;
-    font-family: inherit;
-  }
+  /* (旧 .project-select は project-select-inline に統合) */
 
   /* Issue リスト */
   ul.issues {
@@ -486,7 +499,7 @@ export const render = (state, dispatch) => {
     <div>
       {renderHeader(state, dispatch, { mineCount: viewer?.assignedIssues?.nodes?.length })}
 
-      {/* タブ select + 状態フィルタチップを同じ行に */}
+      {/* Row 1: タブ + （Project 時）プロジェクトセレクタ */}
       <div className="controls-row">
         <select
           className="tab-select"
@@ -500,18 +513,9 @@ export const render = (state, dispatch) => {
           <option value="project">Project</option>
         </select>
 
-        <span className="controls-spacer" />
-
-        <FilterChip active={showBacklog} onClick={() => dispatch({ type: "SET_SHOW_BACKLOG", value: !showBacklog })} title="Backlog を表示">⊟ BL</FilterChip>
-        <FilterChip active={showInReview} onClick={() => dispatch({ type: "SET_SHOW_INREVIEW", value: !showInReview })} title="In Review を表示">⊙ Rev</FilterChip>
-        <FilterChip active={showDone} onClick={() => dispatch({ type: "SET_SHOW_DONE", value: !showDone })} title="Done を表示">✓ Done</FilterChip>
-        <FilterChip active={showCanceled} onClick={() => dispatch({ type: "SET_SHOW_CANCELED", value: !showCanceled })} title="Canceled を表示">⊘ Canc.</FilterChip>
-        <FilterChip active={showDuplicate} onClick={() => dispatch({ type: "SET_SHOW_DUPLICATE", value: !showDuplicate })} title="Duplicate を表示">⎘ Dup</FilterChip>
-      </div>
-
-      {tab === "project" && (
-        <div className="project-select">
+        {tab === "project" && (
           <select
+            className="project-select-inline"
             value={projectId || ""}
             onChange={(e) => dispatch({ type: "SET_PROJECT", projectId: e.target.value || null })}
           >
@@ -520,8 +524,18 @@ export const render = (state, dispatch) => {
               <option key={p.id} value={p.id}>{p.name}</option>
             ))}
           </select>
-        </div>
-      )}
+        )}
+      </div>
+
+      {/* Row 2: 状態フィルタチップ（右寄せ） */}
+      <div className="filter-row">
+        <span className="controls-spacer" />
+        <FilterChip active={showBacklog} onClick={() => dispatch({ type: "SET_SHOW_BACKLOG", value: !showBacklog })} title="Backlog を表示">⊟ BL</FilterChip>
+        <FilterChip active={showInReview} onClick={() => dispatch({ type: "SET_SHOW_INREVIEW", value: !showInReview })} title="In Review を表示">⊙ Rev</FilterChip>
+        <FilterChip active={showDone} onClick={() => dispatch({ type: "SET_SHOW_DONE", value: !showDone })} title="Done を表示">✓ Done</FilterChip>
+        <FilterChip active={showCanceled} onClick={() => dispatch({ type: "SET_SHOW_CANCELED", value: !showCanceled })} title="Canceled を表示">⊘ Canc.</FilterChip>
+        <FilterChip active={showDuplicate} onClick={() => dispatch({ type: "SET_SHOW_DUPLICATE", value: !showDuplicate })} title="Duplicate を表示">⎘ Dup</FilterChip>
+      </div>
 
       {issues.length === 0 ? (
         <div className="empty">

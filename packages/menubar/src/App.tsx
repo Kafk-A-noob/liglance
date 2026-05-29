@@ -290,7 +290,7 @@ function Dashboard() {
         </button>
       </header>
 
-      {/* タブ select + 状態フィルタチップを同じ行に */}
+      {/* Row 1: タブ select + (Project 選んだ時は) プロジェクトセレクタ */}
       <div className="controls-row">
         <select
           className="tab-select"
@@ -304,18 +304,9 @@ function Dashboard() {
           <option value="project">Project</option>
         </select>
 
-        <span className="controls-spacer" />
-
-        <FilterChip active={showBacklog} onClick={toggleShowBacklog} title="Backlog を表示">⊟ BL</FilterChip>
-        <FilterChip active={showInReview} onClick={toggleShowInReview} title="In Review を表示">⊙ Rev</FilterChip>
-        <FilterChip active={showDone} onClick={toggleShowDone} title="Done を表示">✓ Done</FilterChip>
-        <FilterChip active={showCanceled} onClick={toggleShowCanceled} title="Canceled を表示">⊘ Canc.</FilterChip>
-        <FilterChip active={showDuplicate} onClick={toggleShowDuplicate} title="Duplicate を表示">⎘ Dup</FilterChip>
-      </div>
-
-      {tab === "project" && (
-        <div className="project-select">
+        {tab === "project" && (
           <select
+            className="project-select-inline"
             value={projectId ?? ""}
             onChange={(e) => setProjectId(e.target.value || null)}
           >
@@ -326,8 +317,18 @@ function Dashboard() {
               </option>
             ))}
           </select>
-        </div>
-      )}
+        )}
+      </div>
+
+      {/* Row 2: 状態フィルタチップ（右寄せ） */}
+      <div className="filter-row">
+        <span className="controls-spacer" />
+        <FilterChip active={showBacklog} onClick={toggleShowBacklog} title="Backlog を表示">⊟ BL</FilterChip>
+        <FilterChip active={showInReview} onClick={toggleShowInReview} title="In Review を表示">⊙ Rev</FilterChip>
+        <FilterChip active={showDone} onClick={toggleShowDone} title="Done を表示">✓ Done</FilterChip>
+        <FilterChip active={showCanceled} onClick={toggleShowCanceled} title="Canceled を表示">⊘ Canc.</FilterChip>
+        <FilterChip active={showDuplicate} onClick={toggleShowDuplicate} title="Duplicate を表示">⎘ Dup</FilterChip>
+      </div>
 
       {lastError && !viewer ? (
         <div className="error" style={{ textAlign: "left", padding: "12px 4px", fontSize: 11, wordBreak: "break-all" }}>
