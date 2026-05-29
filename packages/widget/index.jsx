@@ -207,14 +207,53 @@ export const className = `
   /* (旧 .project-select は project-select-inline に統合) */
 
   /* Issue リスト: 最大 7 件表示、超えたらスクロール */
+  .issues-scroll {
+    position: relative;
+  }
   ul.issues {
     list-style: none; margin: 0; padding: 0;
     /* 1 件あたり ~44px (padding 14 + content ~29 + border 1) × 7 = 308px */
     max-height: 308px;
     overflow-y: auto;
-    overscroll-behavior: contain; /* スクロールの伝搬を内側で止める */
+    overscroll-behavior: contain;
   }
-  ul.issues::-webkit-scrollbar { width: 0; }
+  /* 半透明のスリムなスクロールバー */
+  ul.issues::-webkit-scrollbar { width: 6px; }
+  ul.issues::-webkit-scrollbar-track { background: transparent; }
+  ul.issues::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.15);
+    border-radius: 3px;
+  }
+  ul.issues::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.3); }
+
+  /* スクロールヒント (▲/▼) — スクロール可能な方向だけ表示 */
+  .scroll-hint {
+    position: absolute;
+    left: 0; right: 6px; /* スクロールバー幅分よけて中央 */
+    height: 18px;
+    text-align: center;
+    font-size: 9px;
+    line-height: 14px;
+    color: rgba(255,255,255,0.65);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s;
+    z-index: 1;
+    text-shadow: 0 0 4px rgba(0,0,0,0.8);
+  }
+  .scroll-hint.top {
+    top: 0;
+    background: linear-gradient(to bottom, rgba(20,20,24,0.9), rgba(20,20,24,0));
+    padding-top: 1px;
+  }
+  .scroll-hint.bottom {
+    bottom: 0;
+    background: linear-gradient(to top, rgba(20,20,24,0.9), rgba(20,20,24,0));
+    padding-bottom: 1px;
+    line-height: 22px;
+  }
+  .issues-scroll.can-up .scroll-hint.top { opacity: 1; }
+  .issues-scroll.can-down .scroll-hint.bottom { opacity: 1; }
 
   li.issue {
     display: grid;
@@ -258,9 +297,10 @@ export const className = `
     background: rgba(94, 106, 210, 0.4);
     border-radius: 4px;
   }
-  .row1 { display: flex; gap: 6px; align-items: baseline; }
+  .row1 { display: flex; gap: 6px; align-items: baseline; min-width: 0; }
   .row1 a {
     color: #fff; text-decoration: none; font-weight: 500; flex: 1;
+    min-width: 0; /* flex item の ellipsis を効かせるために必須 */
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
   .row1 a:hover { text-decoration: underline; }
@@ -418,6 +458,26 @@ export const updateState = (event, prev) => {
 
 // --- render -------------------------------------------------------------
 /** @param {State} state @param {(action:any)=>void} dispatch */
+// スクロール可能方向のヒント表示。ul に attach し、親 div に can-up/can-down を付け外し
+function attachScrollHints(ul) {
+  if (!ul || ul.__lgScrollAttached) return;
+  ul.__lgScrollAttached = true;
+  const wrapper = ul.parentElement;
+  if (!wrapper) return;
+  const update = () => {
+    const canUp = ul.scrollTop > 0;
+    const canDown = ul.scrollTop + ul.clientHeight < ul.scrollHeight - 1;
+    wrapper.classList.toggle("can-up", canUp);
+    wrapper.classList.toggle("can-down", canDown);
+  };
+  ul.addEventListener("scroll", update, { passive: true });
+  // 件数が変わったとき (再フェッチ後) も再計算
+  if (typeof ResizeObserver !== "undefined") {
+    new ResizeObserver(update).observe(ul);
+  }
+  requestAnimationFrame(update);
+}
+
 // 状態取得 fetch を 1 回だけ走らせるためのフラグ
 let statesFetchInFlight = false;
 
@@ -548,7 +608,9 @@ export const render = (state, dispatch) => {
               : "Issue がありません"}
         </div>
       ) : (
-        <ul className="issues">
+        <div className="issues-scroll">
+          <div className="scroll-hint top">▲</div>
+          <ul className="issues" ref={attachScrollHints}>
           {issues.map((issue) => {
             const teamId = issue.team?.id || "";
             const states = statesByTeam[teamId] || [];
@@ -595,7 +657,9 @@ export const render = (state, dispatch) => {
             </li>
             );
           })}
-        </ul>
+          </ul>
+          <div className="scroll-hint bottom">▼</div>
+        </div>
       )}
     </div>
   );

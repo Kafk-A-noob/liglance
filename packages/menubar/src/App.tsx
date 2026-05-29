@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { tokenExists, saveToken, fetchLinear, fetchStates, openUrl, updateIssueState } from "./api";
 import type { Issue, IssueState, LinearResponse, Project, Tab, Viewer } from "./types";
@@ -367,6 +367,29 @@ function IssueList({
   updatingId: string | null;
   onChangeState: (issue: Issue, stateId: string) => void;
 }) {
+  // スクロール可能方向のヒント表示
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const ulRef = useRef<HTMLUListElement>(null);
+  useEffect(() => {
+    const ul = ulRef.current;
+    const wrapper = wrapperRef.current;
+    if (!ul || !wrapper) return;
+    const update = () => {
+      const canUp = ul.scrollTop > 0;
+      const canDown = ul.scrollTop + ul.clientHeight < ul.scrollHeight - 1;
+      wrapper.classList.toggle("can-up", canUp);
+      wrapper.classList.toggle("can-down", canDown);
+    };
+    ul.addEventListener("scroll", update, { passive: true });
+    const ro = new ResizeObserver(update);
+    ro.observe(ul);
+    update();
+    return () => {
+      ul.removeEventListener("scroll", update);
+      ro.disconnect();
+    };
+  }, [issues]);
+
   if (issues.length === 0) {
     return (
       <div className="empty">
@@ -379,7 +402,9 @@ function IssueList({
     );
   }
   return (
-    <ul className="issues">
+    <div className="issues-scroll" ref={wrapperRef}>
+      <div className="scroll-hint top">▲</div>
+      <ul className="issues" ref={ulRef}>
       {issues.map((issue) => {
         const teamId = issue.team?.id ?? "";
         const states = statesByTeam.get(teamId) ?? [];
@@ -421,7 +446,9 @@ function IssueList({
         </li>
         );
       })}
-    </ul>
+      </ul>
+      <div className="scroll-hint bottom">▼</div>
+    </div>
   );
 }
 

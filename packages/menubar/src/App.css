@@ -223,14 +223,58 @@ header .icon-btn.spinning {
 /* (旧 .project-select は project-select-inline に置換、削除) */
 
 /* --- Issue リスト --------------------------------------------------- */
+.issues-scroll {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
 ul.issues {
   list-style: none;
   margin: 0;
   padding: 0;
   flex: 1;
   overflow-y: auto;
+  overscroll-behavior: contain;
 }
-ul.issues::-webkit-scrollbar { width: 0; }
+/* 半透明スクロールバー */
+ul.issues::-webkit-scrollbar { width: 6px; }
+ul.issues::-webkit-scrollbar-track { background: transparent; }
+ul.issues::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.15);
+  border-radius: 3px;
+}
+ul.issues::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.3); }
+
+/* スクロールヒント (▲/▼) — スクロール可能な方向だけ表示 */
+.scroll-hint {
+  position: absolute;
+  left: 0; right: 6px;
+  height: 18px;
+  text-align: center;
+  font-size: 9px;
+  line-height: 14px;
+  color: rgba(255,255,255,0.65);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 1;
+  text-shadow: 0 0 4px rgba(0,0,0,0.8);
+}
+.scroll-hint.top {
+  top: 0;
+  background: linear-gradient(to bottom, rgba(20,20,24,0.9), rgba(20,20,24,0));
+  padding-top: 1px;
+}
+.scroll-hint.bottom {
+  bottom: 0;
+  background: linear-gradient(to top, rgba(20,20,24,0.9), rgba(20,20,24,0));
+  padding-bottom: 1px;
+  line-height: 22px;
+}
+.issues-scroll.can-up .scroll-hint.top { opacity: 1; }
+.issues-scroll.can-down .scroll-hint.bottom { opacity: 1; }
 
 li.issue {
   display: grid;
@@ -277,11 +321,12 @@ header .icon-btn.edit-toggle.active {
   background: rgba(94, 106, 210, 0.4);
   border-radius: 4px;
 }
-.row1 { display: flex; gap: 6px; align-items: baseline; }
+.row1 { display: flex; gap: 6px; align-items: baseline; min-width: 0; }
 .row1 a {
   color: #fff;
   font-weight: 500;
   flex: 1;
+  min-width: 0; /* flex item の ellipsis を効かせるために必須 */
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
