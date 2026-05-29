@@ -151,16 +151,16 @@ header .icon-btn.spinning {
   align-items: center;
   gap: 6px;
   margin-bottom: 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 6px;
 }
 
-/* --- Row 2: 状態フィルタ（右寄せ） ---------------------------------- */
+/* --- Row 2: 状態フィルタ（線の下、右寄せ） -------------------------- */
 .filter-row {
   display: flex;
   align-items: center;
   gap: 4px;
   margin-bottom: 8px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  padding-bottom: 6px;
 }
 .filter-row .controls-spacer { flex: 1; }
 

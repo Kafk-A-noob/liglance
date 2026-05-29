@@ -136,15 +136,15 @@ export const className = `
     align-items: center;
     gap: 6px;
     margin-bottom: 6px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    padding-bottom: 6px;
   }
-  /* Row 2: 状態フィルタ（右寄せ） */
+  /* Row 2: 状態フィルタ（線の下、右寄せ） */
   .filter-row {
     display: flex;
     align-items: center;
     gap: 4px;
     margin-bottom: 8px;
-    border-bottom: 1px solid rgba(255,255,255,0.08);
-    padding-bottom: 6px;
   }
   .filter-row .controls-spacer { flex: 1; }
 
@@ -206,11 +206,13 @@ export const className = `
 
   /* (旧 .project-select は project-select-inline に統合) */
 
-  /* Issue リスト */
+  /* Issue リスト: 最大 7 件表示、超えたらスクロール */
   ul.issues {
     list-style: none; margin: 0; padding: 0;
-    max-height: calc(80vh - 110px);
+    /* 1 件あたり ~44px (padding 14 + content ~29 + border 1) × 7 = 308px */
+    max-height: 308px;
     overflow-y: auto;
+    overscroll-behavior: contain; /* スクロールの伝搬を内側で止める */
   }
   ul.issues::-webkit-scrollbar { width: 0; }
 
