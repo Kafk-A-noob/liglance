@@ -14,9 +14,14 @@ export const deleteToken = (): Promise<void> => invoke<void>("delete_token");
 /**
  * Linear API を叩いて生の JSON 文字列を受け取る。
  * パースは呼び出し側で行う（エラー JSON が混ざることがあるため）。
+ *
+ * @param excludeTypes 除外するワークフロー state.type のリスト
+ *   既知の値: "backlog" | "unstarted" | "started" | "completed" | "canceled"
  */
-export const fetchLinear = async (): Promise<LinearResponse> => {
-  const text = await invoke<string>("fetch_linear");
+export const fetchLinear = async (
+  excludeTypes: string[] = ["completed", "canceled"]
+): Promise<LinearResponse> => {
+  const text = await invoke<string>("fetch_linear", { excludeTypes });
   return JSON.parse(text) as LinearResponse;
 };
 

@@ -102,13 +102,27 @@ function Dashboard() {
     try { return localStorage.getItem("liglance.editMode") === "true"; }
     catch { return false; }
   });
+  // 完了・キャンセル表示の有無（永続化）
+  const [showDone, setShowDone] = useState<boolean>(() => {
+    try { return localStorage.getItem("liglance.showDone") === "true"; }
+    catch { return false; }
+  });
+  const [showCanceled, setShowCanceled] = useState<boolean>(() => {
+    try { return localStorage.getItem("liglance.showCanceled") === "true"; }
+    catch { return false; }
+  });
   // ステータス変更中の issue id（更新中スピナー用）
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      const res = await fetchLinear();
+      // 「表示しない」もの = excludeTypes として API に送る
+      const excludeTypes: string[] = [];
+      if (!showDone) excludeTypes.push("completed");
+      if (!showCanceled) excludeTypes.push("canceled");
+
+      const res = await fetchLinear(excludeTypes);
       setData(res);
       if (res.errors) {
         setLastError(res.errors[0]?.message ?? "API_ERROR");
@@ -121,13 +135,28 @@ function Dashboard() {
     } finally {
       setRefreshing(false);
     }
-  }, []);
+  }, [showDone, showCanceled]);
 
   useEffect(() => {
     refresh();
     const id = setInterval(refresh, REFRESH_INTERVAL_MS);
     return () => clearInterval(id);
   }, [refresh]);
+
+  const toggleShowDone = () => {
+    setShowDone((v) => {
+      const next = !v;
+      try { localStorage.setItem("liglance.showDone", String(next)); } catch {}
+      return next;
+    });
+  };
+  const toggleShowCanceled = () => {
+    setShowCanceled((v) => {
+      const next = !v;
+      try { localStorage.setItem("liglance.showCanceled", String(next)); } catch {}
+      return next;
+    });
+  };
 
   const viewer: Viewer | null = data?.data?.viewer ?? null;
   const projects = useMemo(() => collectProjects(viewer), [viewer]);
@@ -206,6 +235,13 @@ function Dashboard() {
         <TabButton active={tab === "project"} onClick={() => setTab("project")}>
           Project
         </TabButton>
+        <span className="tabs-spacer" />
+        <FilterChip active={showDone} onClick={toggleShowDone} title="Done を表示">
+          ✓ Done
+        </FilterChip>
+        <FilterChip active={showCanceled} onClick={toggleShowCanceled} title="Canceled を表示">
+          ✗ Canc.
+        </FilterChip>
       </div>
 
       {tab === "project" && (
@@ -382,6 +418,29 @@ function TabButton({
 }) {
   return (
     <button className={active ? "active" : ""} onClick={onClick}>
+      {children}
+    </button>
+  );
+}
+
+/** タブと違って "ON/OFF" を表現するチップ */
+function FilterChip({
+  active,
+  onClick,
+  title,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  title?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      className={"filter-chip" + (active ? " active" : "")}
+      onClick={onClick}
+      title={title}
+    >
       {children}
     </button>
   );

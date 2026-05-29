@@ -117,50 +117,76 @@ struct GqlBody {
     query: String,
 }
 
-const QUERY: &str = r#"
-query {
-  viewer {
+/// 状態 type の除外リスト → GraphQL filter 文字列 を組み立てる
+/// 入力は固定の安全リスト（backlog/unstarted/started/completed/canceled）からのみ受け付ける
+fn build_state_filter(exclude_types: &[String]) -> String {
+    // 防御的: 既知の type 以外は捨てる
+    let allowed = ["backlog", "unstarted", "started", "completed", "canceled"];
+    let filtered: Vec<&String> = exclude_types
+        .iter()
+        .filter(|t| allowed.contains(&t.as_str()))
+        .collect();
+
+    if filtered.is_empty() {
+        return String::new();
+    }
+    let quoted: Vec<String> = filtered.iter().map(|t| format!(r#""{}""#, t)).collect();
+    format!(
+        r#"filter: {{ state: {{ type: {{ nin: [{}] }} }} }},"#,
+        quoted.join(", ")
+    )
+}
+
+fn build_query(exclude_types: &[String]) -> String {
+    let filter = build_state_filter(exclude_types);
+    format!(
+        r#"
+query {{
+  viewer {{
     id
     name
-    assignedIssues(filter: { state: { type: { neq: "completed" } } }, first: 50, orderBy: updatedAt) {
-      nodes {
+    assignedIssues({filter} first: 50, orderBy: updatedAt) {{
+      nodes {{
         id identifier title url updatedAt
         priority priorityLabel
-        state { id name color type }
-        project { id name }
-        team { id key }
-      }
-    }
-    teamMemberships {
-      nodes {
-        team {
+        state {{ id name color type }}
+        project {{ id name }}
+        team {{ id key }}
+      }}
+    }}
+    teamMemberships {{
+      nodes {{
+        team {{
           id key name
-          states(first: 20) {
-            nodes { id name color type position }
-          }
-          issues(filter: { state: { type: { neq: "completed" } } }, first: 30, orderBy: updatedAt) {
-            nodes {
+          states(first: 20) {{
+            nodes {{ id name color type position }}
+          }}
+          issues({filter} first: 30, orderBy: updatedAt) {{
+            nodes {{
               id identifier title url updatedAt
               priority priorityLabel
-              state { id name color type }
-              project { id name color }
-              assignee { displayName }
-              team { id }
-            }
-          }
-        }
-      }
-    }
-  }
+              state {{ id name color type }}
+              project {{ id name color }}
+              assignee {{ displayName }}
+              team {{ id }}
+            }}
+          }}
+        }}
+      }}
+    }}
+  }}
+}}
+"#,
+        filter = filter
+    )
 }
-"#;
 
 #[tauri::command]
-async fn fetch_linear() -> Result<String, String> {
+async fn fetch_linear(exclude_types: Vec<String>) -> Result<String, String> {
     let token = read_token()?;
 
     let body = GqlBody {
-        query: QUERY.to_string(),
+        query: build_query(&exclude_types),
     };
 
     let client = reqwest::Client::new();
