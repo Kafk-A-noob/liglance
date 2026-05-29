@@ -290,35 +290,27 @@ function Dashboard() {
         </button>
       </header>
 
-      <div className="tabs">
-        <TabButton active={tab === "mine"} onClick={() => setTab("mine")}>
-          Mine{viewer ? ` (${viewer.assignedIssues.nodes.length})` : ""}
-        </TabButton>
-        <TabButton active={tab === "team"} onClick={() => setTab("team")}>
-          Team
-        </TabButton>
-        <TabButton active={tab === "project"} onClick={() => setTab("project")}>
-          Project
-        </TabButton>
-      </div>
+      {/* タブ select + 状態フィルタチップを同じ行に */}
+      <div className="controls-row">
+        <select
+          className="tab-select"
+          value={tab}
+          onChange={(e) => setTab(e.target.value as Tab)}
+        >
+          <option value="mine">
+            Mine{viewer ? ` (${viewer.assignedIssues.nodes.length})` : ""}
+          </option>
+          <option value="team">Team</option>
+          <option value="project">Project</option>
+        </select>
 
-      {/* 状態フィルタ: 別行で 4 つ並べる（タブ行が混雑するため） */}
-      <div className="filter-row">
-        <FilterChip active={showBacklog} onClick={toggleShowBacklog} title="Backlog を表示">
-          ⊟ BL
-        </FilterChip>
-        <FilterChip active={showInReview} onClick={toggleShowInReview} title="In Review を表示">
-          ⊙ Rev
-        </FilterChip>
-        <FilterChip active={showDone} onClick={toggleShowDone} title="Done を表示">
-          ✓ Done
-        </FilterChip>
-        <FilterChip active={showCanceled} onClick={toggleShowCanceled} title="Canceled を表示">
-          ⊘ Canc.
-        </FilterChip>
-        <FilterChip active={showDuplicate} onClick={toggleShowDuplicate} title="Duplicate を表示">
-          ⎘ Dup
-        </FilterChip>
+        <span className="controls-spacer" />
+
+        <FilterChip active={showBacklog} onClick={toggleShowBacklog} title="Backlog を表示">⊟ BL</FilterChip>
+        <FilterChip active={showInReview} onClick={toggleShowInReview} title="In Review を表示">⊙ Rev</FilterChip>
+        <FilterChip active={showDone} onClick={toggleShowDone} title="Done を表示">✓ Done</FilterChip>
+        <FilterChip active={showCanceled} onClick={toggleShowCanceled} title="Canceled を表示">⊘ Canc.</FilterChip>
+        <FilterChip active={showDuplicate} onClick={toggleShowDuplicate} title="Duplicate を表示">⎘ Dup</FilterChip>
       </div>
 
       {tab === "project" && (
@@ -481,22 +473,6 @@ function StateControl({
           ))}
       </select>
     </span>
-  );
-}
-
-function TabButton({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button className={active ? "active" : ""} onClick={onClick}>
-      {children}
-    </button>
   );
 }
 

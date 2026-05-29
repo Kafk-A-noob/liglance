@@ -145,35 +145,36 @@ header .icon-btn.spinning {
   to { transform: rotate(360deg); }
 }
 
-/* --- タブ ----------------------------------------------------------- */
-.tabs {
+/* --- コントロール行（タブ select + チップ） ------------------------- */
+.controls-row {
   display: flex;
+  align-items: center;
   gap: 4px;
   margin-bottom: 8px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   padding-bottom: 6px;
+  flex-wrap: wrap;
 }
-.tabs button {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+.controls-row .controls-spacer { flex: 1; }
+
+.tab-select {
+  background-color: rgba(94, 106, 210, 0.55);
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 5' fill='white'><polygon points='0,0 8,0 4,5'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 7px 4px;
+  border: 1px solid rgba(94, 106, 210, 0.9);
   color: #fff;
   border-radius: 6px;
-  padding: 3px 10px;
+  padding: 3px 22px 3px 10px;
   font-size: 11px;
   cursor: pointer;
   font-family: inherit;
+  appearance: none;
+  -webkit-appearance: none;
 }
-.tabs button.active {
-  background: rgba(94, 106, 210, 0.55);
-  border-color: rgba(94, 106, 210, 0.9);
-}
-/* 状態フィルタ行（タブの下） */
-.filter-row {
-  display: flex;
-  gap: 4px;
-  margin-bottom: 8px;
-  flex-wrap: wrap;
-}
+.tab-select:focus { outline: none; }
+
 .filter-chip {
   background: transparent;
   border: 1px dashed rgba(255,255,255,0.2);

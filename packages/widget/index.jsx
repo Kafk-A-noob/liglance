@@ -130,35 +130,36 @@ export const className = `
     to   { transform: rotate(360deg); }
   }
 
-  /* タブ行 */
-  .tabs {
+  /* コントロール行（タブ select + チップ） */
+  .controls-row {
     display: flex;
+    align-items: center;
     gap: 4px;
     margin-bottom: 8px;
     border-bottom: 1px solid rgba(255,255,255,0.08);
     padding-bottom: 6px;
+    flex-wrap: wrap;
   }
-  .tabs button {
-    background: rgba(255,255,255,0.06);
-    border: 1px solid rgba(255,255,255,0.1);
+  .controls-row .controls-spacer { flex: 1; }
+
+  .tab-select {
+    background-color: rgba(94, 106, 210, 0.55);
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 5' fill='white'><polygon points='0,0 8,0 4,5'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    background-size: 7px 4px;
+    border: 1px solid rgba(94, 106, 210, 0.9);
     color: #fff;
     border-radius: 6px;
-    padding: 3px 10px;
+    padding: 3px 22px 3px 10px;
     font-size: 11px;
     cursor: pointer;
     font-family: inherit;
+    appearance: none;
+    -webkit-appearance: none;
   }
-  .tabs button.active {
-    background: rgba(94, 106, 210, 0.55);
-    border-color: rgba(94, 106, 210, 0.9);
-  }
-  /* 状態フィルタ行 */
-  .filter-row {
-    display: flex;
-    gap: 4px;
-    margin-bottom: 8px;
-    flex-wrap: wrap;
-  }
+  .tab-select:focus { outline: none; }
+
   .filter-chip {
     background: transparent;
     border: 1px dashed rgba(255,255,255,0.2);
@@ -485,35 +486,27 @@ export const render = (state, dispatch) => {
     <div>
       {renderHeader(state, dispatch, { mineCount: viewer?.assignedIssues?.nodes?.length })}
 
-      <div className="tabs">
-        <TabButton active={tab === "mine"} onClick={() => dispatch({ type: "SET_TAB", tab: "mine" })}>
-          Mine{viewer?.assignedIssues?.nodes ? ` (${viewer.assignedIssues.nodes.length})` : ""}
-        </TabButton>
-        <TabButton active={tab === "team"} onClick={() => dispatch({ type: "SET_TAB", tab: "team" })}>
-          Team
-        </TabButton>
-        <TabButton active={tab === "project"} onClick={() => dispatch({ type: "SET_TAB", tab: "project" })}>
-          Project
-        </TabButton>
-      </div>
+      {/* タブ select + 状態フィルタチップを同じ行に */}
+      <div className="controls-row">
+        <select
+          className="tab-select"
+          value={tab}
+          onChange={(e) => dispatch({ type: "SET_TAB", tab: e.target.value })}
+        >
+          <option value="mine">
+            Mine{viewer?.assignedIssues?.nodes ? ` (${viewer.assignedIssues.nodes.length})` : ""}
+          </option>
+          <option value="team">Team</option>
+          <option value="project">Project</option>
+        </select>
 
-      {/* 状態フィルタ: 4 つ並べる */}
-      <div className="filter-row">
-        <FilterChip active={showBacklog} onClick={() => dispatch({ type: "SET_SHOW_BACKLOG", value: !showBacklog })} title="Backlog を表示">
-          ⊟ BL
-        </FilterChip>
-        <FilterChip active={showInReview} onClick={() => dispatch({ type: "SET_SHOW_INREVIEW", value: !showInReview })} title="In Review を表示">
-          ⊙ Rev
-        </FilterChip>
-        <FilterChip active={showDone} onClick={() => dispatch({ type: "SET_SHOW_DONE", value: !showDone })} title="Done を表示">
-          ✓ Done
-        </FilterChip>
-        <FilterChip active={showCanceled} onClick={() => dispatch({ type: "SET_SHOW_CANCELED", value: !showCanceled })} title="Canceled を表示">
-          ⊘ Canc.
-        </FilterChip>
-        <FilterChip active={showDuplicate} onClick={() => dispatch({ type: "SET_SHOW_DUPLICATE", value: !showDuplicate })} title="Duplicate を表示">
-          ⎘ Dup
-        </FilterChip>
+        <span className="controls-spacer" />
+
+        <FilterChip active={showBacklog} onClick={() => dispatch({ type: "SET_SHOW_BACKLOG", value: !showBacklog })} title="Backlog を表示">⊟ BL</FilterChip>
+        <FilterChip active={showInReview} onClick={() => dispatch({ type: "SET_SHOW_INREVIEW", value: !showInReview })} title="In Review を表示">⊙ Rev</FilterChip>
+        <FilterChip active={showDone} onClick={() => dispatch({ type: "SET_SHOW_DONE", value: !showDone })} title="Done を表示">✓ Done</FilterChip>
+        <FilterChip active={showCanceled} onClick={() => dispatch({ type: "SET_SHOW_CANCELED", value: !showCanceled })} title="Canceled を表示">⊘ Canc.</FilterChip>
+        <FilterChip active={showDuplicate} onClick={() => dispatch({ type: "SET_SHOW_DUPLICATE", value: !showDuplicate })} title="Duplicate を表示">⎘ Dup</FilterChip>
       </div>
 
       {tab === "project" && (
@@ -722,14 +715,6 @@ function pickIssues(viewer, tab, projectId, filterOpts) {
 function FilterChip({ active, onClick, title, children }) {
   return (
     <button className={"filter-chip" + (active ? " active" : "")} onClick={onClick} title={title}>
-      {children}
-    </button>
-  );
-}
-
-function TabButton({ active, onClick, children }) {
-  return (
-    <button className={active ? "active" : ""} onClick={onClick}>
       {children}
     </button>
   );
