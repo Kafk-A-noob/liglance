@@ -16,6 +16,13 @@ use tauri::{
     Emitter, Manager, PhysicalPosition, WebviewWindow,
 };
 
+// macOS では security CLI を使い、それ以外は keyring crate を使う。
+// 理由:
+//  - macOS dev ビルドは未署名ゆえ keyring crate の ACL 検証で詰まる
+//  - Windows/Linux では keyring crate が公式に動くので安全
+#[cfg(not(target_os = "macos"))]
+use keyring::Entry;
+
 /// Übersicht ウィジェットと共有する Keychain サービス名
 const KEYCHAIN_SERVICE: &str = "linear-widget-token";
 
@@ -24,40 +31,28 @@ fn keychain_account() -> String {
 }
 
 // --- Tauri コマンド: トークン CRUD ----------------------------------------
-//
-// macOS Keychain への読み書きは Apple 署名済みの `security` CLI 経由で行う。
-// keyring crate を使うと、dev ビルド（未署名バイナリ）では ACL の都合で
-// 保存できても読み出せないケースが頻発するため。
-// shell 経由なら Übersicht 版と完全に同じ経路になり、両方が同じ値を見られる。
 
-/// keychain にエントリーがあるかどうか
+// ==== macOS: shell out to `security` CLI ===============================
+#[cfg(target_os = "macos")]
 #[tauri::command]
 fn token_exists() -> bool {
     Command::new("security")
-        .args([
-            "find-generic-password",
-            "-a",
-            &keychain_account(),
-            "-s",
-            KEYCHAIN_SERVICE,
-        ])
+        .args(["find-generic-password", "-a", &keychain_account(), "-s", KEYCHAIN_SERVICE])
         .output()
         .map(|o| o.status.success())
         .unwrap_or(false)
 }
 
+#[cfg(target_os = "macos")]
 #[tauri::command]
 fn save_token(token: String) -> Result<(), String> {
     let output = Command::new("security")
         .args([
             "add-generic-password",
-            "-a",
-            &keychain_account(),
-            "-s",
-            KEYCHAIN_SERVICE,
-            "-w",
-            &token,
-            "-U", // 既存なら上書き
+            "-a", &keychain_account(),
+            "-s", KEYCHAIN_SERVICE,
+            "-w", &token,
+            "-U",
         ])
         .output()
         .map_err(|e| format!("security command spawn failed: {}", e))?;
@@ -70,44 +65,71 @@ fn save_token(token: String) -> Result<(), String> {
     Ok(())
 }
 
+#[cfg(target_os = "macos")]
 #[tauri::command]
 fn delete_token() -> Result<(), String> {
     let _ = Command::new("security")
-        .args([
-            "delete-generic-password",
-            "-a",
-            &keychain_account(),
-            "-s",
-            KEYCHAIN_SERVICE,
-        ])
+        .args(["delete-generic-password", "-a", &keychain_account(), "-s", KEYCHAIN_SERVICE])
         .output();
     Ok(())
 }
 
-/// Keychain から実際にトークンを取り出す（内部用）
+#[cfg(target_os = "macos")]
 fn read_token() -> Result<String, String> {
     let output = Command::new("security")
         .args([
             "find-generic-password",
-            "-a",
-            &keychain_account(),
-            "-s",
-            KEYCHAIN_SERVICE,
+            "-a", &keychain_account(),
+            "-s", KEYCHAIN_SERVICE,
             "-w",
         ])
         .output()
         .map_err(|e| format!("security command spawn failed: {}", e))?;
     if !output.status.success() {
-        return Err(format!(
-            "NO_TOKEN: {}",
-            String::from_utf8_lossy(&output.stderr).trim()
-        ));
+        return Err(format!("NO_TOKEN: {}", String::from_utf8_lossy(&output.stderr).trim()));
     }
     let token = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    if token.is_empty() {
-        return Err("EMPTY_TOKEN".to_string());
-    }
+    if token.is_empty() { return Err("EMPTY_TOKEN".to_string()); }
     Ok(token)
+}
+
+// ==== non-macOS (Windows / Linux): keyring crate =======================
+#[cfg(not(target_os = "macos"))]
+#[tauri::command]
+fn token_exists() -> bool {
+    Entry::new(KEYCHAIN_SERVICE, &keychain_account())
+        .and_then(|e| e.get_password())
+        .is_ok()
+}
+
+#[cfg(not(target_os = "macos"))]
+#[tauri::command]
+fn save_token(token: String) -> Result<(), String> {
+    let entry = Entry::new(KEYCHAIN_SERVICE, &keychain_account())
+        .map_err(|e| format!("keyring entry: {}", e))?;
+    entry.set_password(&token).map_err(|e| format!("keyring set: {}", e))?;
+    Ok(())
+}
+
+#[cfg(not(target_os = "macos"))]
+#[tauri::command]
+fn delete_token() -> Result<(), String> {
+    if let Ok(entry) = Entry::new(KEYCHAIN_SERVICE, &keychain_account()) {
+        let _ = entry.delete_credential();
+    }
+    Ok(())
+}
+
+#[cfg(not(target_os = "macos"))]
+fn read_token() -> Result<String, String> {
+    let entry = Entry::new(KEYCHAIN_SERVICE, &keychain_account())
+        .map_err(|e| format!("keyring entry: {}", e))?;
+    match entry.get_password() {
+        Ok(t) if !t.is_empty() => Ok(t),
+        Ok(_) => Err("EMPTY_TOKEN".to_string()),
+        Err(keyring::Error::NoEntry) => Err("NO_TOKEN".to_string()),
+        Err(e) => Err(format!("keyring: {}", e)),
+    }
 }
 
 // --- Tauri コマンド: Linear API ------------------------------------------
@@ -271,17 +293,24 @@ async fn update_issue_state(issue_id: String, state_id: String) -> Result<String
 
 /// 外部ブラウザで URL を開く。
 /// frontend の <a target="_blank"> は Tauri WebView 内で開いてしまうため、
-/// macOS の `open` コマンド経由でデフォルトブラウザに渡す。
+/// OS 標準コマンド経由でデフォルトブラウザに渡す。
 /// セキュリティ: http(s) スキームのみ許可（任意コマンド実行を防ぐ）
 #[tauri::command]
 fn open_url(url: String) -> Result<(), String> {
     if !url.starts_with("http://") && !url.starts_with("https://") {
         return Err(format!("rejected scheme: {}", &url[..url.len().min(20)]));
     }
-    Command::new("open")
-        .arg(&url)
-        .spawn()
-        .map_err(|e| format!("open failed: {}", e))?;
+
+    #[cfg(target_os = "macos")]
+    let result = Command::new("open").arg(&url).spawn();
+
+    #[cfg(target_os = "windows")]
+    let result = Command::new("cmd").args(["/C", "start", "", &url]).spawn();
+
+    #[cfg(target_os = "linux")]
+    let result = Command::new("xdg-open").arg(&url).spawn();
+
+    result.map_err(|e| format!("open failed: {}", e))?;
     Ok(())
 }
 
@@ -292,12 +321,28 @@ fn position_window_under_tray(window: &WebviewWindow, tray_position: PhysicalPos
     let window_size = window.outer_size().unwrap_or_default();
     let scale = monitor.as_ref().map(|m| m.scale_factor()).unwrap_or(1.0);
 
-    // tray_position はトレイアイコンの位置（screen 座標, physical）
-    // ウィンドウを中央寄せでアイコンの直下に配置
-    let x = tray_position.x - (window_size.width as f64 / 2.0);
-    let y = tray_position.y + (4.0 * scale); // アイコンから少し下
+    #[cfg(target_os = "macos")]
+    {
+        // macOS: メニューバーアイコンの直下、中央寄せ
+        let x = tray_position.x - (window_size.width as f64 / 2.0);
+        let y = tray_position.y + (4.0 * scale);
+        let _ = window.set_position(PhysicalPosition::new(x, y));
+    }
 
-    let _ = window.set_position(PhysicalPosition::new(x, y));
+    #[cfg(not(target_os = "macos"))]
+    {
+        // Windows/Linux: タスクトレイ近く（画面右下）
+        // tray_position はアイコンクリック位置、そこを参考に上方向に
+        if let Some(m) = monitor {
+            let screen = m.size();
+            let margin = (12.0 * scale) as i32;
+            let x = (screen.width as i32) - (window_size.width as i32) - margin;
+            // タスクバーの高さ (~48px) ぶん上、さらに余白
+            let y = tray_position.y as i32 - (window_size.height as i32) - margin;
+            let y_clamped = y.max(margin);
+            let _ = window.set_position(PhysicalPosition::new(x, y_clamped));
+        }
+    }
 }
 
 // --- エントリーポイント --------------------------------------------------
