@@ -20,18 +20,45 @@
 
 ### 機能（両方共通）
 
-- Mine / Team / Project の 3 タブ切り替え
-- Project はドロップダウンで選択
-- 各 Issue の状態（workflow state）をカラードットで表示
+**表示**
+- **Mine / Team / Project** をドロップダウンで切替（Project 選択時は右に Project セレクタが現れる）
+- 各 Issue の **state ドット**（workflow state の色）
+- **優先度バッジ**（Urgent は `!`、High/Medium/Low は信号強度バー、Linear 本家ライク）
+- Issue は **優先度順 → 更新日時順** で並ぶ
 - 接続ステータスドット（🟢 正常 / 🟡 2 分以上経過 / 🔴 エラー）
 - 最終更新時刻表示（MM/DD HH:mm）
 - 手動リロードボタン
 - 1 分ごとに自動更新
 
+**フィルタ**（チップでトグル、localStorage で永続化）
+- `⊟ BL` Backlog
+- `⊙ Rev` In Review（state 名に "review" を含む）
+- `✓ Done` 完了
+- `⊘ Canc.` キャンセル
+- `⎘ Dup` 重複（duplicate type）
+- すべて既定 OFF。Todo / In Progress は常に表示
+
+**編集**
+- ヘッダーの `🔒 / 🔓` で **編集モード** 切替
+- ON にすると state ドットがドロップダウンになり、その場で **ステータス変更** 可能
+- 誤クリック防止のため既定 OFF
+- 変更は Linear API に即時反映、その後自動で再フェッチ
+
+**外部リンク**
+- Issue タイトルクリックでデフォルトブラウザに Issue ページが開く
+  - Tauri は Rust 経由（`open` コマンド、http(s) 限定の防御付き）
+  - Übersicht は WebKit の標準挙動
+
 ### Tauri 版だけの機能
 
 - **初回起動ウィザード** で API Key を貼り付け → Keychain に保存
 - トレイ右クリックで「Reset token…」「Quit」メニュー
+- フォーカスが外れると自動でウィンドウを閉じる
+
+### Übersicht 版だけの機能
+
+- **ドラッグで位置移動**（ヘッダーを掴んで動かす、localStorage で永続化）
+- **最大 7 件表示**、超えた分は内部スクロール
 
 ---
 
@@ -149,8 +176,10 @@ Tauri 版は **Linear API 呼び出しも Rust 側** で行います。理由：
 |---|---|
 | Tauri 版の初回起動で開けない | 未署名アプリのため。Finder で右クリック → 開く |
 | Übersicht に何も表示されない | システム設定 → プライバシー → 画面収録 で Übersicht を許可 |
-| 「NO_TOKEN」エラー | Tauri 版: トレイ右クリック → Reset token… で再入力 |
-| 「Linear API error」 | Linear で API Key を再発行 → Keychain を上書き |
+| 「NO_TOKEN」エラー | Tauri 版: トレイ右クリック → Reset token… で再入力。Übersicht 版のみの場合は `security delete-generic-password -s linear-widget-token` 後に保存し直し |
+| 「Linear API error」 | Linear で API Key を再発行 → Keychain を上書き（`-U` で上書き） |
+| 「Query too complex」 | 通常起きません。出たら Issue に報告 |
+| 編集モードでドロップダウンが空 | 編集モード ON 後、states の取得に数秒かかる。少し待って再操作 |
 
 ---
 
