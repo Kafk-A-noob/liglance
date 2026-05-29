@@ -215,6 +215,7 @@ export const className = `
     /* 1 件あたり ~44px (padding 14 + content ~29 + border 1) × 7 = 308px */
     max-height: 308px;
     overflow-y: auto;
+    overflow-x: hidden; /* 横スクロールバーが出ないように明示 */
     overscroll-behavior: contain;
   }
   /* 半透明のスリムなスクロールバー */
@@ -257,11 +258,13 @@ export const className = `
 
   li.issue {
     display: grid;
-    grid-template-columns: 8px 1fr;
+    /* minmax(0, 1fr) で 2 列目が確実に縮む（child の min-width: auto 罠回避） */
+    grid-template-columns: 8px minmax(0, 1fr);
     gap: 8px;
     padding: 7px 4px;
     border-bottom: 1px solid rgba(255,255,255,0.05);
   }
+  li.issue > div { min-width: 0; }
   li.issue:last-child { border-bottom: none; }
   .dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; }
   .dot.updating {
