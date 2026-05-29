@@ -17,6 +17,9 @@ export type Issue = {
   title: string;
   url: string;
   updatedAt: string;
+  /** 0 = No priority, 1 = Urgent, 2 = High, 3 = Medium, 4 = Low */
+  priority: number;
+  priorityLabel: string;
   state: IssueState | null;
   project: Project | null;
   team?: { key: string } | null;

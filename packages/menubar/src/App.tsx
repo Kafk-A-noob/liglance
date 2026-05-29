@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { tokenExists, saveToken, fetchLinear } from "./api";
 import type { Issue, LinearResponse, Project, Tab, Viewer } from "./types";
-import { formatRelative, formatTime, redactSecrets } from "./utils";
+import { formatRelative, formatTime, priorityMeta, redactSecrets, safeUrl } from "./utils";
 import "./App.css";
 
 const REFRESH_INTERVAL_MS = 60_000;
@@ -220,7 +220,9 @@ function IssueList({
   }
   return (
     <ul className="issues">
-      {issues.map((issue) => (
+      {issues.map((issue) => {
+        const pri = priorityMeta(issue.priority);
+        return (
         <li key={issue.identifier} className="issue">
           <span
             className="dot"
@@ -228,8 +230,17 @@ function IssueList({
           />
           <div>
             <div className="row1">
+              {pri && (
+                <span
+                  className="priority-badge"
+                  style={{ background: pri.color }}
+                  title={pri.label}
+                >
+                  {pri.short}
+                </span>
+              )}
               <span className="ident">{issue.identifier}</span>
-              <a href={issue.url} target="_blank" rel="noreferrer">
+              <a href={safeUrl(issue.url)} target="_blank" rel="noreferrer">
                 {issue.title}
               </a>
             </div>
@@ -244,7 +255,8 @@ function IssueList({
             </div>
           </div>
         </li>
-      ))}
+        );
+      })}
     </ul>
   );
 }

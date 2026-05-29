@@ -191,6 +191,19 @@ export const className = `
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
   .row1 a:hover { text-decoration: underline; }
+  .priority-badge {
+    display: inline-block;
+    min-width: 14px;
+    height: 14px;
+    line-height: 14px;
+    text-align: center;
+    border-radius: 3px;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: #fff;
+    padding: 0 3px;
+    text-shadow: none;
+  }
   .ident { opacity: 0.55; font-size: 10.5px; font-family: ui-monospace, monospace; }
   .meta {
     opacity: 0.55; font-size: 10.5px; margin-top: 2px;
@@ -352,13 +365,20 @@ export const render = (state, dispatch) => {
         </div>
       ) : (
         <ul className="issues">
-          {issues.map((issue) => (
+          {issues.map((issue) => {
+            const pri = priorityMeta(issue.priority);
+            return (
             <li key={issue.identifier} className="issue">
               <span className="dot" style={{ background: issue.state?.color || "#888" }} />
               <div>
                 <div className="row1">
+                  {pri && (
+                    <span className="priority-badge" style={{ background: pri.color }} title={pri.label}>
+                      {pri.short}
+                    </span>
+                  )}
                   <span className="ident">{issue.identifier}</span>
-                  <a href={issue.url} target="_blank" rel="noreferrer">{issue.title}</a>
+                  <a href={safeUrl(issue.url)} target="_blank" rel="noreferrer">{issue.title}</a>
                 </div>
                 <div className="meta">
                   <span>{issue.state?.name}</span>
@@ -370,7 +390,8 @@ export const render = (state, dispatch) => {
                 </div>
               </div>
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
     </div>
@@ -487,6 +508,26 @@ function formatRelative(iso) {
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
   if (diff < 86400 * 30) return `${Math.floor(diff / 86400)}d ago`;
   return new Date(iso).toLocaleDateString();
+}
+
+/**
+ * 外部 URL を href に渡す前に検証。javascript: 等を弾く。
+ * 万一 Linear のレスポンスに悪意ある URL が混入してもブラウザ内 JS 実行を防ぐ。
+ */
+function safeUrl(u) {
+  if (!u || typeof u !== "string") return "#";
+  return /^https?:\/\//i.test(u) ? u : "#";
+}
+
+/** Linear の priority(0-4) → 表示用の色とラベル */
+function priorityMeta(priority) {
+  switch (priority) {
+    case 1: return { color: "#ef4444", short: "U", label: "Urgent" };
+    case 2: return { color: "#f97316", short: "H", label: "High" };
+    case 3: return { color: "#eab308", short: "M", label: "Medium" };
+    case 4: return { color: "#6b7280", short: "L", label: "Low" };
+    default: return null;
+  }
 }
 
 /** timestamp(ms) → "MM/DD HH:mm" 形式で常に日付付き */

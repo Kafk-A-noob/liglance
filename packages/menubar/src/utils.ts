@@ -1,5 +1,31 @@
 // 表示まわりのちょっとしたユーティリティ。Übersicht 版と同じ関数。
 
+/**
+ * 外部由来の URL を href に渡す前に検証する。
+ * javascript: / data: / file: 等のスキームを弾き、安全な http(s) のみ通す。
+ * 万一 Linear API の応答に悪意ある URL が混入しても、WebView 内 JS 実行を防ぐ。
+ */
+export function safeUrl(u: string | null | undefined): string {
+  if (!u || typeof u !== "string") return "#";
+  return /^https?:\/\//i.test(u) ? u : "#";
+}
+
+/** Linear の priority(0-4) → 表示用の色とラベル */
+export function priorityMeta(priority: number): {
+  color: string;
+  short: string;
+  label: string;
+} | null {
+  switch (priority) {
+    case 1: return { color: "#ef4444", short: "U", label: "Urgent" };
+    case 2: return { color: "#f97316", short: "H", label: "High" };
+    case 3: return { color: "#eab308", short: "M", label: "Medium" };
+    case 4: return { color: "#6b7280", short: "L", label: "Low" };
+    default: return null;
+  }
+}
+
+
 /** ISO 日時 → "3h ago" */
 export function formatRelative(iso: string): string {
   const t = new Date(iso).getTime();

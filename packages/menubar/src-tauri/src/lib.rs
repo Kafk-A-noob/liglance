@@ -125,6 +125,7 @@ query {
     assignedIssues(filter: { state: { type: { neq: "completed" } } }, first: 50, orderBy: updatedAt) {
       nodes {
         identifier title url updatedAt
+        priority priorityLabel
         state { name color type }
         project { id name }
         team { key }
@@ -137,6 +138,7 @@ query {
           issues(filter: { state: { type: { neq: "completed" } } }, first: 30, orderBy: updatedAt) {
             nodes {
               identifier title url updatedAt
+              priority priorityLabel
               state { name color type }
               project { id name color }
               assignee { displayName }
@@ -191,8 +193,6 @@ fn position_window_under_tray(window: &WebviewWindow, tray_position: PhysicalPos
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_http::init())
         .invoke_handler(tauri::generate_handler![
             token_exists,
             save_token,

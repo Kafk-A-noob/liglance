@@ -210,6 +210,19 @@ li.issue:last-child { border-bottom: none; }
   white-space: nowrap;
 }
 .row1 a:hover { text-decoration: underline; }
+.priority-badge {
+  display: inline-block;
+  min-width: 14px;
+  height: 14px;
+  line-height: 14px;
+  text-align: center;
+  border-radius: 3px;
+  font-size: 9.5px;
+  font-weight: 700;
+  color: #fff;
+  padding: 0 3px;
+  text-shadow: none;
+}
 .ident {
   opacity: 0.55;
   font-size: 10.5px;
