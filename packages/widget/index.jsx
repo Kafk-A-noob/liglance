@@ -321,6 +321,8 @@ export const initialState = {
   showCanceled: loadBool("liglance.showCanceled", false),
   showBacklog: loadBool("liglance.showBacklog", true),
   showInReview: loadBool("liglance.showInReview", true),
+  // Duplicate は noise 寄りなのでデフォルト OFF
+  showDuplicate: loadBool("liglance.showDuplicate", false),
   // 編集モード: ON でステータス変更可。誤クリック防止のためデフォルト OFF
   editMode: loadBool("liglance.editMode", false),
   /** @type {Record<string, Array<{id:string,name:string,color:string,type:string,position?:number}>>} */
@@ -383,6 +385,9 @@ export const updateState = (event, prev) => {
     case "SET_SHOW_INREVIEW":
       try { localStorage.setItem("liglance.showInReview", String(event.value)); } catch {}
       return { ...prev, showInReview: event.value };
+    case "SET_SHOW_DUPLICATE":
+      try { localStorage.setItem("liglance.showDuplicate", String(event.value)); } catch {}
+      return { ...prev, showDuplicate: event.value };
     case "SET_EDIT_MODE":
       try { localStorage.setItem("liglance.editMode", String(event.value)); } catch {}
       return { ...prev, editMode: event.value };
@@ -435,7 +440,7 @@ function changeIssueState(dispatch, issueId, stateId) {
 }
 
 export const render = (state, dispatch) => {
-  const { output, lastError, lastUpdated, refreshing, tab, projectId, showDone, showCanceled, showBacklog, showInReview, editMode, statesByTeam, updatingIssueId } = state;
+  const { output, lastError, lastUpdated, refreshing, tab, projectId, showDone, showCanceled, showBacklog, showInReview, showDuplicate, editMode, statesByTeam, updatingIssueId } = state;
 
   // 編集モード ON で states 未取得なら fetch
   if (editMode && Object.keys(statesByTeam).length === 0) {
@@ -476,7 +481,7 @@ export const render = (state, dispatch) => {
   const projects = collectProjects(viewer);
 
   // 現在のタブに応じて表示する Issue を決める
-  const issues = pickIssues(viewer, tab, projectId, { showDone, showCanceled, showBacklog, showInReview });
+  const issues = pickIssues(viewer, tab, projectId, { showDone, showCanceled, showBacklog, showInReview, showDuplicate });
 
   return (
     <div>
@@ -507,6 +512,9 @@ export const render = (state, dispatch) => {
         </FilterChip>
         <FilterChip active={showCanceled} onClick={() => dispatch({ type: "SET_SHOW_CANCELED", value: !showCanceled })} title="Canceled を表示">
           ✗ Canc.
+        </FilterChip>
+        <FilterChip active={showDuplicate} onClick={() => dispatch({ type: "SET_SHOW_DUPLICATE", value: !showDuplicate })} title="Duplicate を表示">
+          ⎘ Dup
         </FilterChip>
       </div>
 
@@ -676,13 +684,14 @@ function sortByPriorityThenUpdated(a, b) {
  *  - In Review は state.name に "review" を含むかで判定（type=started の一部のため）
  */
 function filterByState(issues, opts) {
-  const { showDone, showCanceled, showBacklog, showInReview } = opts;
+  const { showDone, showCanceled, showBacklog, showInReview, showDuplicate } = opts;
   return issues.filter((i) => {
     const t = i.state?.type;
     const name = (i.state?.name || "").toLowerCase();
     if (t === "completed" && !showDone) return false;
     if (t === "canceled" && !showCanceled) return false;
     if (t === "backlog" && !showBacklog) return false;
+    if (t === "duplicate" && !showDuplicate) return false;
     if (!showInReview && name.includes("review")) return false;
     return true;
   });

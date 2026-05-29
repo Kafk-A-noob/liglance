@@ -121,7 +121,7 @@ struct GqlBody {
 /// 入力は固定の安全リスト（backlog/unstarted/started/completed/canceled）からのみ受け付ける
 fn build_state_filter(exclude_types: &[String]) -> String {
     // 防御的: 既知の type 以外は捨てる
-    let allowed = ["backlog", "unstarted", "started", "completed", "canceled"];
+    let allowed = ["backlog", "unstarted", "started", "completed", "canceled", "duplicate", "triage"];
     let filtered: Vec<&String> = exclude_types
         .iter()
         .filter(|t| allowed.contains(&t.as_str()))

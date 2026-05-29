@@ -124,6 +124,11 @@ function Dashboard() {
       return v === null ? true : v === "true";
     } catch { return true; }
   });
+  // Duplicate は noise 寄りなのでデフォルト OFF
+  const [showDuplicate, setShowDuplicate] = useState<boolean>(() => {
+    try { return localStorage.getItem("liglance.showDuplicate") === "true"; }
+    catch { return false; }
+  });
   // ステータス変更中の issue id（更新中スピナー用）
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   // 別 fetch で取得した states マップ（編集モード ON 時のみ取得）
@@ -139,6 +144,7 @@ function Dashboard() {
       if (!showDone) excludeTypes.push("completed");
       if (!showCanceled) excludeTypes.push("canceled");
       if (!showBacklog) excludeTypes.push("backlog");
+      if (!showDuplicate) excludeTypes.push("duplicate");
 
       const res = await fetchLinear(excludeTypes);
       setData(res);
@@ -153,7 +159,7 @@ function Dashboard() {
     } finally {
       setRefreshing(false);
     }
-  }, [showDone, showCanceled, showBacklog]);
+  }, [showDone, showCanceled, showBacklog, showDuplicate]);
 
   useEffect(() => {
     refresh();
@@ -202,6 +208,13 @@ function Dashboard() {
     setShowInReview((v) => {
       const next = !v;
       try { localStorage.setItem("liglance.showInReview", String(next)); } catch {}
+      return next;
+    });
+  };
+  const toggleShowDuplicate = () => {
+    setShowDuplicate((v) => {
+      const next = !v;
+      try { localStorage.setItem("liglance.showDuplicate", String(next)); } catch {}
       return next;
     });
   };
@@ -306,6 +319,9 @@ function Dashboard() {
         </FilterChip>
         <FilterChip active={showCanceled} onClick={toggleShowCanceled} title="Canceled を表示">
           ✗ Canc.
+        </FilterChip>
+        <FilterChip active={showDuplicate} onClick={toggleShowDuplicate} title="Duplicate を表示">
+          ⎘ Dup
         </FilterChip>
       </div>
 
