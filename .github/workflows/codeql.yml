@@ -1,0 +1,58 @@
+# GitHub CodeQL: コードの semantic 静的解析でセキュリティバグを検出。
+# Public リポジトリは無料、Private は有料 (GitHub Advanced Security)。
+#
+# 言語:
+# - JavaScript/TypeScript: 主に menubar の React + widget の JSX
+# - Rust: ベータサポート、Tauri バックエンド
+name: CodeQL
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # 毎週月曜 09:00 JST = 00:00 UTC に full scan
+    - cron: "0 0 * * 1"
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [javascript-typescript, rust]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          queries: security-extended,security-and-quality
+
+      # Rust の場合 Tauri build に必要な Linux ライブラリを入れる
+      - name: Install Linux deps (rust only)
+        if: matrix.language == 'rust'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"

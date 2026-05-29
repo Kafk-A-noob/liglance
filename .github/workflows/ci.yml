@@ -1,0 +1,106 @@
+# PR / push 時に走る CI チェック。
+# Branch Protection の "Required status checks" に登録する想定。
+#
+# - frontend: TypeScript の型 & build、pnpm audit
+# - backend:  Rust の cargo check, cargo audit
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# 同じブランチで複数 push されたら古いの止めて新しいだけ走らせる
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    name: Frontend (Tauri menubar React)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/menubar
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: packages/menubar/pnpm-lock.yaml
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: TypeScript build (tsc + vite)
+        run: pnpm build
+
+      - name: pnpm audit
+        run: pnpm audit --audit-level=moderate
+
+  backend:
+    name: Backend (Tauri Rust)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/menubar/src-tauri
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux deps for Tauri
+        # Linux で Tauri を build するのに必要 (GitHub runner 用)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: packages/menubar/src-tauri
+
+      - name: cargo check
+        run: cargo check --all-targets
+
+      - name: cargo audit
+        uses: actions-rust-lang/audit@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          workingDirectory: packages/menubar/src-tauri
+        # unmaintained 警告は GTK3 (Linux 専用、本アプリ macOS) なので fail させない
+        continue-on-error: true
+
+  widget:
+    name: Widget (Übersicht JSX syntax)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: JSX parse check (babel)
+        run: |
+          npm install --silent @babel/core @babel/preset-react
+          node -e "
+            const { transformSync } = require('@babel/core');
+            const fs = require('fs');
+            const code = fs.readFileSync('packages/widget/index.jsx', 'utf-8');
+            try {
+              transformSync(code, { presets: ['@babel/preset-react'], filename: 'index.jsx' });
+              console.log('widget index.jsx: parse OK');
+            } catch (e) {
+              console.error('widget index.jsx ERROR:', e.message);
+              process.exit(1);
+            }
+          "
