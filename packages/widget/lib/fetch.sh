@@ -28,11 +28,11 @@ query {
     name
     assignedIssues(filter: { state: { type: { neq: "completed" } } }, first: 50, orderBy: updatedAt) {
       nodes {
-        identifier title url updatedAt
+        id identifier title url updatedAt
         priority priorityLabel
-        state { name color type }
+        state { id name color type }
         project { id name }
-        team { key }
+        team { id key }
       }
     }
     teamMemberships {
@@ -41,11 +41,12 @@ query {
           id key name
           issues(filter: { state: { type: { neq: "completed" } } }, first: 30, orderBy: updatedAt) {
             nodes {
-              identifier title url updatedAt
+              id identifier title url updatedAt
               priority priorityLabel
-              state { name color type }
+              state { id name color type }
               project { id name color }
               assignee { displayName }
+              team { id }
             }
           }
         }

@@ -19,3 +19,20 @@ export const fetchLinear = async (): Promise<LinearResponse> => {
   const text = await invoke<string>("fetch_linear");
   return JSON.parse(text) as LinearResponse;
 };
+
+/** 外部ブラウザで URL を開く（Tauri WebView 内では開かない） */
+export const openUrl = (url: string): Promise<void> =>
+  invoke<void>("open_url", { url });
+
+/** Issue のワークフロー状態を更新 */
+export const updateIssueState = async (
+  issueId: string,
+  stateId: string
+): Promise<{ success: boolean }> => {
+  const text = await invoke<string>("update_issue_state", { issueId, stateId });
+  const parsed = JSON.parse(text);
+  if (parsed.errors) {
+    throw new Error(parsed.errors[0]?.message ?? "API error");
+  }
+  return { success: parsed?.data?.issueUpdate?.success ?? false };
+};

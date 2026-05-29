@@ -191,19 +191,32 @@ export const className = `
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
   .row1 a:hover { text-decoration: underline; }
-  .priority-badge {
+  /* === 優先度バッジ === */
+  .priority-urgent {
     display: inline-block;
-    min-width: 14px;
-    height: 14px;
-    line-height: 14px;
+    width: 14px;
     text-align: center;
-    border-radius: 3px;
-    font-size: 9.5px;
-    font-weight: 700;
-    color: #fff;
-    padding: 0 3px;
-    text-shadow: none;
+    font-weight: 900;
+    font-size: 13px;
+    line-height: 1;
   }
+  .priority-bars {
+    display: inline-flex;
+    align-items: flex-end;
+    gap: 1.5px;
+    width: 12px;
+    height: 11px;
+  }
+  .priority-bars .bar {
+    width: 3px;
+    border-radius: 1px;
+    background: currentColor;
+    opacity: 0.2;
+  }
+  .priority-bars .bar.on { opacity: 1; }
+  .priority-bars .bar-1 { height: 4px; }
+  .priority-bars .bar-2 { height: 7px; }
+  .priority-bars .bar-3 { height: 10px; }
   .ident { opacity: 0.55; font-size: 10.5px; font-family: ui-monospace, monospace; }
   .meta {
     opacity: 0.55; font-size: 10.5px; margin-top: 2px;
@@ -365,18 +378,12 @@ export const render = (state, dispatch) => {
         </div>
       ) : (
         <ul className="issues">
-          {issues.map((issue) => {
-            const pri = priorityMeta(issue.priority);
-            return (
+          {issues.map((issue) => (
             <li key={issue.identifier} className="issue">
               <span className="dot" style={{ background: issue.state?.color || "#888" }} />
               <div>
                 <div className="row1">
-                  {pri && (
-                    <span className="priority-badge" style={{ background: pri.color }} title={pri.label}>
-                      {pri.short}
-                    </span>
-                  )}
+                  <PriorityBadge priority={issue.priority} />
                   <span className="ident">{issue.identifier}</span>
                   <a href={safeUrl(issue.url)} target="_blank" rel="noreferrer">{issue.title}</a>
                 </div>
@@ -390,8 +397,7 @@ export const render = (state, dispatch) => {
                 </div>
               </div>
             </li>
-            );
-          })}
+          ))}
         </ul>
       )}
     </div>
@@ -519,15 +525,34 @@ function safeUrl(u) {
   return /^https?:\/\//i.test(u) ? u : "#";
 }
 
-/** Linear の priority(0-4) → 表示用の色とラベル */
+/**
+ * Linear の priority(0-4) → 表示用メタ
+ * Urgent は "!" 表示、それ以外は信号強度的なバー（filled=点灯本数）
+ */
 function priorityMeta(priority) {
   switch (priority) {
-    case 1: return { color: "#ef4444", short: "U", label: "Urgent" };
-    case 2: return { color: "#f97316", short: "H", label: "High" };
-    case 3: return { color: "#eab308", short: "M", label: "Medium" };
-    case 4: return { color: "#6b7280", short: "L", label: "Low" };
+    case 1: return { color: "#ef4444", label: "Urgent", kind: "urgent", filled: 0 };
+    case 2: return { color: "#f97316", label: "High",   kind: "bars",   filled: 3 };
+    case 3: return { color: "#eab308", label: "Medium", kind: "bars",   filled: 2 };
+    case 4: return { color: "#06b6d4", label: "Low",    kind: "bars",   filled: 1 };
     default: return null;
   }
+}
+
+/** 優先度バッジを描画 (Übersicht widget) */
+function PriorityBadge({ priority }) {
+  const m = priorityMeta(priority);
+  if (!m) return null;
+  if (m.kind === "urgent") {
+    return <span className="priority-urgent" style={{ color: m.color }} title={m.label}>!</span>;
+  }
+  return (
+    <span className="priority-bars" style={{ color: m.color }} title={m.label}>
+      <span className={"bar bar-1" + (m.filled >= 1 ? " on" : "")} />
+      <span className={"bar bar-2" + (m.filled >= 2 ? " on" : "")} />
+      <span className={"bar bar-3" + (m.filled >= 3 ? " on" : "")} />
+    </span>
+  );
 }
 
 /** timestamp(ms) → "MM/DD HH:mm" 形式で常に日付付き */

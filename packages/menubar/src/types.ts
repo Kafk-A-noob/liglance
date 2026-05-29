@@ -1,9 +1,11 @@
 // Linear GraphQL レスポンスの型定義（必要なフィールドだけ）
 
 export type IssueState = {
+  id: string;
   name: string;
   color: string;
   type: string;
+  position?: number;
 };
 
 export type Project = {
@@ -13,6 +15,7 @@ export type Project = {
 };
 
 export type Issue = {
+  id: string;
   identifier: string;
   title: string;
   url: string;
@@ -22,8 +25,16 @@ export type Issue = {
   priorityLabel: string;
   state: IssueState | null;
   project: Project | null;
-  team?: { key: string } | null;
+  team?: { id: string; key?: string } | null;
   assignee?: { displayName: string } | null;
+};
+
+export type TeamWithStates = {
+  id: string;
+  key: string;
+  name: string;
+  states: { nodes: IssueState[] };
+  issues: { nodes: Issue[] };
 };
 
 export type Viewer = {
@@ -31,14 +42,7 @@ export type Viewer = {
   name: string;
   assignedIssues: { nodes: Issue[] };
   teamMemberships: {
-    nodes: Array<{
-      team: {
-        id: string;
-        key: string;
-        name: string;
-        issues: { nodes: Issue[] };
-      };
-    }>;
+    nodes: Array<{ team: TeamWithStates }>;
   };
 };
 

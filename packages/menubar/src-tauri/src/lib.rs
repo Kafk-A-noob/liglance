@@ -124,24 +124,28 @@ query {
     name
     assignedIssues(filter: { state: { type: { neq: "completed" } } }, first: 50, orderBy: updatedAt) {
       nodes {
-        identifier title url updatedAt
+        id identifier title url updatedAt
         priority priorityLabel
-        state { name color type }
+        state { id name color type }
         project { id name }
-        team { key }
+        team { id key }
       }
     }
     teamMemberships {
       nodes {
         team {
           id key name
+          states(first: 20) {
+            nodes { id name color type position }
+          }
           issues(filter: { state: { type: { neq: "completed" } } }, first: 30, orderBy: updatedAt) {
             nodes {
-              identifier title url updatedAt
+              id identifier title url updatedAt
               priority priorityLabel
-              state { name color type }
+              state { id name color type }
               project { id name color }
               assignee { displayName }
+              team { id }
             }
           }
         }
@@ -173,6 +177,55 @@ async fn fetch_linear() -> Result<String, String> {
     Ok(text)
 }
 
+/// Issue のステータス（workflow state）を変更する。
+/// Linear GraphQL の issueUpdate mutation を呼ぶ。
+#[tauri::command]
+async fn update_issue_state(issue_id: String, state_id: String) -> Result<String, String> {
+    let token = read_token()?;
+    // GraphQL mutation - 変数を埋め込み（issue_id/state_id 形式は ID 文字列なので適切にエスケープ）
+    // 防御的: id 形式は UUID 想定。英数字+ハイフンのみ受け付ける
+    if !issue_id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-') {
+        return Err("invalid issue_id format".to_string());
+    }
+    if !state_id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-') {
+        return Err("invalid state_id format".to_string());
+    }
+
+    let query = format!(
+        r#"mutation {{ issueUpdate(id: "{}", input: {{ stateId: "{}" }}) {{ success issue {{ id state {{ id name }} }} }} }}"#,
+        issue_id, state_id
+    );
+    let body = GqlBody { query };
+
+    let client = reqwest::Client::new();
+    let resp = client
+        .post("https://api.linear.app/graphql")
+        .header("Authorization", token)
+        .header("Content-Type", "application/json")
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| format!("http: {}", e))?;
+
+    resp.text().await.map_err(|e| format!("read body: {}", e))
+}
+
+/// 外部ブラウザで URL を開く。
+/// frontend の <a target="_blank"> は Tauri WebView 内で開いてしまうため、
+/// macOS の `open` コマンド経由でデフォルトブラウザに渡す。
+/// セキュリティ: http(s) スキームのみ許可（任意コマンド実行を防ぐ）
+#[tauri::command]
+fn open_url(url: String) -> Result<(), String> {
+    if !url.starts_with("http://") && !url.starts_with("https://") {
+        return Err(format!("rejected scheme: {}", &url[..url.len().min(20)]));
+    }
+    Command::new("open")
+        .arg(&url)
+        .spawn()
+        .map_err(|e| format!("open failed: {}", e))?;
+    Ok(())
+}
+
 // --- ウィンドウ表示位置を menubar アイコン直下に合わせる ------------------
 
 fn position_window_under_tray(window: &WebviewWindow, tray_position: PhysicalPosition<f64>) {
@@ -198,6 +251,8 @@ pub fn run() {
             save_token,
             delete_token,
             fetch_linear,
+            open_url,
+            update_issue_state,
         ])
         .setup(|app| {
             // macOS: Dock から消す（メニューバーアプリにする）

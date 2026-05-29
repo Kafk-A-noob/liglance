@@ -10,17 +10,24 @@ export function safeUrl(u: string | null | undefined): string {
   return /^https?:\/\//i.test(u) ? u : "#";
 }
 
-/** Linear の priority(0-4) → 表示用の色とラベル */
+/**
+ * Linear の priority(0-4) → 表示用の色とラベル
+ * Linear 本家のアイコン体系を踏襲（信号強度的な見せ方）
+ *  - filled = 何本バーが点灯しているか / 3（Urgent は "!" にする）
+ */
 export function priorityMeta(priority: number): {
   color: string;
-  short: string;
   label: string;
+  /** "urgent" は ! 表示、それ以外は filled/3 のバー数 */
+  kind: "urgent" | "bars";
+  /** kind:"bars" のとき何本点灯するか */
+  filled: 0 | 1 | 2 | 3;
 } | null {
   switch (priority) {
-    case 1: return { color: "#ef4444", short: "U", label: "Urgent" };
-    case 2: return { color: "#f97316", short: "H", label: "High" };
-    case 3: return { color: "#eab308", short: "M", label: "Medium" };
-    case 4: return { color: "#6b7280", short: "L", label: "Low" };
+    case 1: return { color: "#ef4444", label: "Urgent", kind: "urgent", filled: 0 };
+    case 2: return { color: "#f97316", label: "High",   kind: "bars",   filled: 3 };
+    case 3: return { color: "#eab308", label: "Medium", kind: "bars",   filled: 2 };
+    case 4: return { color: "#06b6d4", label: "Low",    kind: "bars",   filled: 1 };
     default: return null;
   }
 }

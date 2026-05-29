@@ -109,6 +109,14 @@ fn read_token() -> Result<String, String> {
 - テーマ切替（light / dark / 自動）
 - 設定 UI（refreshFrequency などをアプリ内で変えられるように）
 
+## 編集機能の分担
+
+- **Tauri 版**: ステータス更新・編集モード ON/OFF・将来的なフィルタなど **編集機能はこちらに集中**
+- **Übersicht 版**: 「常に視界に入る」用途に振り切って **read-only**（壁紙レイヤーで編集 UI を出すと操作が辛い）
+
+Übersicht 版でステータス変更したい場合は Tauri 版を開いて操作してください。
+両者は同じ Keychain トークンを共有しているので、API 経由で同じ結果が得られます。
+
 ## やらないこと（明示）
 
 - Linear OAuth 対応：本ツールは個人ユースに振っている。OAuth は登録・運用コストが見合わない（[初期検討議事録](https://github.com/Kafk-A-noob/liglance/commits/main) 参照）

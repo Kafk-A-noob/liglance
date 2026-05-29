@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { tokenExists, saveToken, fetchLinear } from "./api";
-import type { Issue, LinearResponse, Project, Tab, Viewer } from "./types";
-import { formatRelative, formatTime, priorityMeta, redactSecrets, safeUrl } from "./utils";
+import { tokenExists, saveToken, fetchLinear, openUrl, updateIssueState } from "./api";
+import type { Issue, IssueState, LinearResponse, Project, Tab, Viewer } from "./types";
+import { formatRelative, formatTime, redactSecrets, safeUrl } from "./utils";
+import { PriorityBadge } from "./PriorityBadge";
 import "./App.css";
 
 const REFRESH_INTERVAL_MS = 60_000;
@@ -96,6 +97,13 @@ function Dashboard() {
   const [refreshing, setRefreshing] = useState(false);
   const [tab, setTab] = useState<Tab>("mine");
   const [projectId, setProjectId] = useState<string | null>(null);
+  // 編集モード: 既定 OFF。誤クリックでステータスを変えないため
+  const [editMode, setEditMode] = useState<boolean>(() => {
+    try { return localStorage.getItem("liglance.editMode") === "true"; }
+    catch { return false; }
+  });
+  // ステータス変更中の issue id（更新中スピナー用）
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setRefreshing(true);
@@ -127,6 +135,29 @@ function Dashboard() {
     () => pickIssues(viewer, tab, projectId),
     [viewer, tab, projectId]
   );
+  // team id → states[] のマップ。ステータス変更ドロップダウンで使う
+  const statesByTeam = useMemo(() => collectStates(viewer), [viewer]);
+
+  const toggleEdit = () => {
+    setEditMode((v) => {
+      const next = !v;
+      try { localStorage.setItem("liglance.editMode", String(next)); } catch {}
+      return next;
+    });
+  };
+
+  const handleChangeState = async (issue: Issue, stateId: string) => {
+    if (!issue.id || !stateId || stateId === issue.state?.id) return;
+    setUpdatingId(issue.id);
+    try {
+      await updateIssueState(issue.id, stateId);
+      await refresh(); // 即座に最新化
+    } catch (err) {
+      setLastError(String(err));
+    } finally {
+      setUpdatingId(null);
+    }
+  };
 
   const statusColor = getStatusColor(lastUpdated, lastError);
   const statusTitle = lastError
@@ -148,6 +179,13 @@ function Dashboard() {
           {lastUpdated ? formatTime(lastUpdated) : "—"}
         </span>
         <span className="spacer" />
+        <button
+          className={"icon-btn edit-toggle" + (editMode ? " active" : "")}
+          onClick={toggleEdit}
+          title={editMode ? "編集モード: ON（クリックで OFF）" : "編集モード: OFF（クリックで ON）"}
+        >
+          {editMode ? "🔓" : "🔒"}
+        </button>
         <button
           className={"icon-btn" + (refreshing ? " spinning" : "")}
           onClick={refresh}
@@ -192,7 +230,15 @@ function Dashboard() {
           {redactSecrets(lastError)}
         </div>
       ) : (
-        <IssueList tab={tab} projectId={projectId} issues={issues} />
+        <IssueList
+          tab={tab}
+          projectId={projectId}
+          issues={issues}
+          editMode={editMode}
+          statesByTeam={statesByTeam}
+          updatingId={updatingId}
+          onChangeState={handleChangeState}
+        />
       )}
     </div>
   );
@@ -202,10 +248,18 @@ function IssueList({
   tab,
   projectId,
   issues,
+  editMode,
+  statesByTeam,
+  updatingId,
+  onChangeState,
 }: {
   tab: Tab;
   projectId: string | null;
   issues: Issue[];
+  editMode: boolean;
+  statesByTeam: Map<string, IssueState[]>;
+  updatingId: string | null;
+  onChangeState: (issue: Issue, stateId: string) => void;
 }) {
   if (issues.length === 0) {
     return (
@@ -221,26 +275,30 @@ function IssueList({
   return (
     <ul className="issues">
       {issues.map((issue) => {
-        const pri = priorityMeta(issue.priority);
+        const teamId = issue.team?.id ?? "";
+        const states = statesByTeam.get(teamId) ?? [];
+        const isUpdating = updatingId === issue.id;
         return (
         <li key={issue.identifier} className="issue">
-          <span
-            className="dot"
-            style={{ background: issue.state?.color || "#888" }}
+          <StateControl
+            issue={issue}
+            states={states}
+            editMode={editMode}
+            updating={isUpdating}
+            onChange={(sid) => onChangeState(issue, sid)}
           />
           <div>
             <div className="row1">
-              {pri && (
-                <span
-                  className="priority-badge"
-                  style={{ background: pri.color }}
-                  title={pri.label}
-                >
-                  {pri.short}
-                </span>
-              )}
+              <PriorityBadge priority={issue.priority} />
               <span className="ident">{issue.identifier}</span>
-              <a href={safeUrl(issue.url)} target="_blank" rel="noreferrer">
+              <a
+                href={safeUrl(issue.url)}
+                onClick={(e) => {
+                  // Tauri WebView 内で開かないよう preventDefault → Rust に渡す
+                  e.preventDefault();
+                  void openUrl(safeUrl(issue.url));
+                }}
+              >
                 {issue.title}
               </a>
             </div>
@@ -258,6 +316,58 @@ function IssueList({
         );
       })}
     </ul>
+  );
+}
+
+/** ステータスドット or 編集モード時は select */
+function StateControl({
+  issue,
+  states,
+  editMode,
+  updating,
+  onChange,
+}: {
+  issue: Issue;
+  states: IssueState[];
+  editMode: boolean;
+  updating: boolean;
+  onChange: (stateId: string) => void;
+}) {
+  if (updating) {
+    return <span className="dot updating" title="更新中" />;
+  }
+  if (!editMode || states.length === 0) {
+    return (
+      <span
+        className="dot"
+        style={{ background: issue.state?.color || "#888" }}
+        title={issue.state?.name}
+      />
+    );
+  }
+  // 編集モード: 色付きドット + 透明な select を重ねる
+  return (
+    <span className="state-select-wrap">
+      <span
+        className="dot"
+        style={{ background: issue.state?.color || "#888" }}
+      />
+      <select
+        className="state-select"
+        value={issue.state?.id ?? ""}
+        onChange={(e) => onChange(e.target.value)}
+        title={`ステータス変更 (現在: ${issue.state?.name ?? "—"})`}
+      >
+        {states
+          .slice()
+          .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+          .map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
+          ))}
+      </select>
+    </span>
   );
 }
 
@@ -289,6 +399,17 @@ function getStatusColor(
   const age = Date.now() - lastUpdated;
   if (age > REFRESH_INTERVAL_MS * 2) return "#f4c542";
   return "#4ade80";
+}
+
+/** team.id → states[] のマップを作る */
+function collectStates(viewer: Viewer | null): Map<string, IssueState[]> {
+  const map = new Map<string, IssueState[]>();
+  if (!viewer) return map;
+  for (const m of viewer.teamMemberships?.nodes ?? []) {
+    const t = m.team;
+    if (t?.id && t.states?.nodes) map.set(t.id, t.states.nodes);
+  }
+  return map;
 }
 
 function collectProjects(viewer: Viewer | null): Project[] {
