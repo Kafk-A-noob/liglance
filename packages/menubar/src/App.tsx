@@ -111,18 +111,14 @@ function Dashboard() {
     try { return localStorage.getItem("liglance.showCanceled") === "true"; }
     catch { return false; }
   });
-  // Backlog と In Review は通常作業の一部なのでデフォルト ON
+  // Backlog / In Review もデフォルト OFF（ユーザー選好に合わせて noise 寄り扱い）
   const [showBacklog, setShowBacklog] = useState<boolean>(() => {
-    try {
-      const v = localStorage.getItem("liglance.showBacklog");
-      return v === null ? true : v === "true";
-    } catch { return true; }
+    try { return localStorage.getItem("liglance.showBacklog") === "true"; }
+    catch { return false; }
   });
   const [showInReview, setShowInReview] = useState<boolean>(() => {
-    try {
-      const v = localStorage.getItem("liglance.showInReview");
-      return v === null ? true : v === "true";
-    } catch { return true; }
+    try { return localStorage.getItem("liglance.showInReview") === "true"; }
+    catch { return false; }
   });
   // Duplicate は noise 寄りなのでデフォルト OFF
   const [showDuplicate, setShowDuplicate] = useState<boolean>(() => {
@@ -309,16 +305,16 @@ function Dashboard() {
       {/* 状態フィルタ: 別行で 4 つ並べる（タブ行が混雑するため） */}
       <div className="filter-row">
         <FilterChip active={showBacklog} onClick={toggleShowBacklog} title="Backlog を表示">
-          📋 BL
+          ⊟ BL
         </FilterChip>
         <FilterChip active={showInReview} onClick={toggleShowInReview} title="In Review を表示">
-          👁 Rev
+          ⊙ Rev
         </FilterChip>
         <FilterChip active={showDone} onClick={toggleShowDone} title="Done を表示">
           ✓ Done
         </FilterChip>
         <FilterChip active={showCanceled} onClick={toggleShowCanceled} title="Canceled を表示">
-          ✗ Canc.
+          ⊘ Canc.
         </FilterChip>
         <FilterChip active={showDuplicate} onClick={toggleShowDuplicate} title="Duplicate を表示">
           ⎘ Dup

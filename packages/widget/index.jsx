@@ -315,13 +315,11 @@ export const initialState = {
   lastUpdated: null,
   lastError: null,
   refreshing: false,
-  // 状態フィルタ。Done/Canceled は noise なのでデフォルト OFF、
-  // Backlog/InReview は通常作業なのでデフォルト ON
+  // 状態フィルタ。Todo / In Progress 以外はデフォルト OFF（必要なときだけ ON にする）
   showDone: loadBool("liglance.showDone", false),
   showCanceled: loadBool("liglance.showCanceled", false),
-  showBacklog: loadBool("liglance.showBacklog", true),
-  showInReview: loadBool("liglance.showInReview", true),
-  // Duplicate は noise 寄りなのでデフォルト OFF
+  showBacklog: loadBool("liglance.showBacklog", false),
+  showInReview: loadBool("liglance.showInReview", false),
   showDuplicate: loadBool("liglance.showDuplicate", false),
   // 編集モード: ON でステータス変更可。誤クリック防止のためデフォルト OFF
   editMode: loadBool("liglance.editMode", false),
@@ -502,16 +500,16 @@ export const render = (state, dispatch) => {
       {/* 状態フィルタ: 4 つ並べる */}
       <div className="filter-row">
         <FilterChip active={showBacklog} onClick={() => dispatch({ type: "SET_SHOW_BACKLOG", value: !showBacklog })} title="Backlog を表示">
-          📋 BL
+          ⊟ BL
         </FilterChip>
         <FilterChip active={showInReview} onClick={() => dispatch({ type: "SET_SHOW_INREVIEW", value: !showInReview })} title="In Review を表示">
-          👁 Rev
+          ⊙ Rev
         </FilterChip>
         <FilterChip active={showDone} onClick={() => dispatch({ type: "SET_SHOW_DONE", value: !showDone })} title="Done を表示">
           ✓ Done
         </FilterChip>
         <FilterChip active={showCanceled} onClick={() => dispatch({ type: "SET_SHOW_CANCELED", value: !showCanceled })} title="Canceled を表示">
-          ✗ Canc.
+          ⊘ Canc.
         </FilterChip>
         <FilterChip active={showDuplicate} onClick={() => dispatch({ type: "SET_SHOW_DUPLICATE", value: !showDuplicate })} title="Duplicate を表示">
           ⎘ Dup
