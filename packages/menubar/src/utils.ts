@@ -46,6 +46,16 @@ export function formatRelative(iso: string): string {
 }
 
 /**
+ * 優先度ソート用のランク。Linear の priority は
+ * 0 = No priority, 1 = Urgent, 2 = High, 3 = Medium, 4 = Low
+ * UI 的には Urgent → High → Medium → Low → None の順にしたいので、
+ * 0 (None) を一番後ろに送る。
+ */
+export function priorityRank(p: number): number {
+  return p === 0 ? 99 : p;
+}
+
+/**
  * 文字列から代表的なシークレット形式を *** で塗り潰す。
  * UI にエラーメッセージを生表示するとき、ライブラリが
  * Authorization ヘッダなどをログ出力に混入させていた場合の保険。

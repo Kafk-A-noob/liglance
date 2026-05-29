@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { tokenExists, saveToken, fetchLinear, openUrl, updateIssueState } from "./api";
+import { tokenExists, saveToken, fetchLinear, fetchStates, openUrl, updateIssueState } from "./api";
 import type { Issue, IssueState, LinearResponse, Project, Tab, Viewer } from "./types";
-import { formatRelative, formatTime, redactSecrets, safeUrl } from "./utils";
+import { formatRelative, formatTime, priorityRank, redactSecrets, safeUrl } from "./utils";
 import { PriorityBadge } from "./PriorityBadge";
 import "./App.css";
 
@@ -113,6 +113,10 @@ function Dashboard() {
   });
   // ステータス変更中の issue id（更新中スピナー用）
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  // 別 fetch で取得した states マップ（編集モード ON 時のみ取得）
+  const [statesByTeam, setStatesByTeam] = useState<Map<string, IssueState[]>>(
+    new Map()
+  );
 
   const refresh = useCallback(async () => {
     setRefreshing(true);
@@ -143,6 +147,22 @@ function Dashboard() {
     return () => clearInterval(id);
   }, [refresh]);
 
+  // 編集モード ON のときだけ states を別 fetch（query 複雑度を抑えるため）
+  useEffect(() => {
+    if (!editMode) return;
+    if (statesByTeam.size > 0) return; // 既に取得済みなら再取得不要
+    fetchStates()
+      .then((res) => {
+        const map = new Map<string, IssueState[]>();
+        for (const m of res.data?.viewer?.teamMemberships?.nodes ?? []) {
+          if (m.team?.id) map.set(m.team.id, m.team.states.nodes);
+        }
+        setStatesByTeam(map);
+      })
+      .catch((err) => setLastError(String(err)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editMode]);
+
   const toggleShowDone = () => {
     setShowDone((v) => {
       const next = !v;
@@ -164,9 +184,6 @@ function Dashboard() {
     () => pickIssues(viewer, tab, projectId),
     [viewer, tab, projectId]
   );
-  // team id → states[] のマップ。ステータス変更ドロップダウンで使う
-  const statesByTeam = useMemo(() => collectStates(viewer), [viewer]);
-
   const toggleEdit = () => {
     setEditMode((v) => {
       const next = !v;
@@ -460,17 +477,6 @@ function getStatusColor(
   return "#4ade80";
 }
 
-/** team.id → states[] のマップを作る */
-function collectStates(viewer: Viewer | null): Map<string, IssueState[]> {
-  const map = new Map<string, IssueState[]>();
-  if (!viewer) return map;
-  for (const m of viewer.teamMemberships?.nodes ?? []) {
-    const t = m.team;
-    if (t?.id && t.states?.nodes) map.set(t.id, t.states.nodes);
-  }
-  return map;
-}
-
 function collectProjects(viewer: Viewer | null): Project[] {
   if (!viewer) return [];
   const map = new Map<string, Project>();
@@ -486,6 +492,13 @@ function collectProjects(viewer: Viewer | null): Project[] {
   return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
 }
 
+/** 優先度（Urgent→Low→None）→ updatedAt の降順で並べる共通比較関数 */
+function sortByPriorityThenUpdated(a: Issue, b: Issue): number {
+  const pr = priorityRank(a.priority) - priorityRank(b.priority);
+  if (pr !== 0) return pr;
+  return a.updatedAt < b.updatedAt ? 1 : -1;
+}
+
 function pickIssues(
   viewer: Viewer | null,
   tab: Tab,
@@ -493,7 +506,9 @@ function pickIssues(
 ): Issue[] {
   if (!viewer) return [];
   if (tab === "mine") {
-    return viewer.assignedIssues?.nodes ?? [];
+    return (viewer.assignedIssues?.nodes ?? [])
+      .slice()
+      .sort(sortByPriorityThenUpdated);
   }
   const seen = new Set<string>();
   const all: Issue[] = [];
@@ -506,9 +521,7 @@ function pickIssues(
   }
   if (tab === "project") {
     if (!projectId) return [];
-    return all
-      .filter((i) => i.project?.id === projectId)
-      .sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));
+    return all.filter((i) => i.project?.id === projectId).sort(sortByPriorityThenUpdated);
   }
-  return all.sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));
+  return all.sort(sortByPriorityThenUpdated);
 }

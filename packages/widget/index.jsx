@@ -472,10 +472,19 @@ function collectProjects(viewer) {
   return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
 }
 
+/** priority(0-4) → rank (0=なし は最後尾) */
+function priorityRank(p) { return p === 0 ? 99 : p; }
+/** 優先度（Urgent→Low→None）→ updatedAt の降順 */
+function sortByPriorityThenUpdated(a, b) {
+  const d = priorityRank(a.priority) - priorityRank(b.priority);
+  if (d !== 0) return d;
+  return a.updatedAt < b.updatedAt ? 1 : -1;
+}
+
 function pickIssues(viewer, tab, projectId) {
   if (!viewer) return [];
   if (tab === "mine") {
-    return viewer.assignedIssues?.nodes ?? [];
+    return (viewer.assignedIssues?.nodes ?? []).slice().sort(sortByPriorityThenUpdated);
   }
   // Team と Project は teamMemberships.team.issues を平らに結合
   const seen = new Set();
@@ -490,10 +499,9 @@ function pickIssues(viewer, tab, projectId) {
   }
   if (tab === "project") {
     if (!projectId) return [];
-    return all.filter((i) => i.project?.id === projectId)
-              .sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));
+    return all.filter((i) => i.project?.id === projectId).sort(sortByPriorityThenUpdated);
   }
-  return all.sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));
+  return all.sort(sortByPriorityThenUpdated);
 }
 
 function TabButton({ active, onClick, children }) {

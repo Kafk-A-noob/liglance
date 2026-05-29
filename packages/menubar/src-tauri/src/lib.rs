@@ -158,9 +158,6 @@ query {{
       nodes {{
         team {{
           id key name
-          states(first: 20) {{
-            nodes {{ id name color type position }}
-          }}
           issues({filter} first: 30, orderBy: updatedAt) {{
             nodes {{
               id identifier title url updatedAt
@@ -179,6 +176,42 @@ query {{
 "#,
         filter = filter
     )
+}
+
+/// チームごとの workflow states を別 query で取得。
+/// 編集モード ON 時のみ呼ばれる軽量クエリ。
+const STATES_QUERY: &str = r#"
+query {
+  viewer {
+    teamMemberships {
+      nodes {
+        team {
+          id
+          states(first: 30) {
+            nodes { id name color type position }
+          }
+        }
+      }
+    }
+  }
+}
+"#;
+
+#[tauri::command]
+async fn fetch_states() -> Result<String, String> {
+    let token = read_token()?;
+    let body = GqlBody { query: STATES_QUERY.to_string() };
+
+    let client = reqwest::Client::new();
+    let resp = client
+        .post("https://api.linear.app/graphql")
+        .header("Authorization", token)
+        .header("Content-Type", "application/json")
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| format!("http: {}", e))?;
+    resp.text().await.map_err(|e| format!("read body: {}", e))
 }
 
 #[tauri::command]
@@ -277,6 +310,7 @@ pub fn run() {
             save_token,
             delete_token,
             fetch_linear,
+            fetch_states,
             open_url,
             update_issue_state,
         ])

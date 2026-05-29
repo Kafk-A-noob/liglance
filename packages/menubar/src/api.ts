@@ -25,6 +25,27 @@ export const fetchLinear = async (
   return JSON.parse(text) as LinearResponse;
 };
 
+/** workflow state 一覧（編集モード用）を取得 */
+export type StatesResponse = {
+  data?: {
+    viewer?: {
+      teamMemberships: {
+        nodes: Array<{
+          team: {
+            id: string;
+            states: { nodes: Array<{ id: string; name: string; color: string; type: string; position?: number }> };
+          };
+        }>;
+      };
+    };
+  };
+  errors?: Array<{ message: string }>;
+};
+export const fetchStates = async (): Promise<StatesResponse> => {
+  const text = await invoke<string>("fetch_states");
+  return JSON.parse(text) as StatesResponse;
+};
+
 /** 外部ブラウザで URL を開く（Tauri WebView 内では開かない） */
 export const openUrl = (url: string): Promise<void> =>
   invoke<void>("open_url", { url });
