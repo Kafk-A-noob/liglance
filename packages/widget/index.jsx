@@ -152,6 +152,20 @@ export const className = `
     background: rgba(94, 106, 210, 0.55);
     border-color: rgba(94, 106, 210, 0.9);
   }
+  .tabs .tabs-spacer { flex: 1; }
+  .tabs .filter-chip {
+    font-size: 10px;
+    padding: 2px 7px;
+    opacity: 0.55;
+    background: transparent;
+    border: 1px dashed rgba(255,255,255,0.2);
+  }
+  .tabs .filter-chip.active {
+    opacity: 1;
+    background: rgba(80,200,120,0.25);
+    border-color: rgba(80,200,120,0.7);
+    border-style: solid;
+  }
 
   /* プロジェクトセレクタ */
   .project-select {
@@ -185,6 +199,39 @@ export const className = `
   }
   li.issue:last-child { border-bottom: none; }
   .dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; }
+  .dot.updating {
+    background: #888;
+    animation: pulse 0.8s ease-in-out infinite alternate;
+  }
+  @keyframes pulse { from { opacity: 0.3; } to { opacity: 1; } }
+
+  .state-select-wrap {
+    position: relative;
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    margin-top: 5px;
+  }
+  .state-select-wrap .dot {
+    position: absolute;
+    top: 0; left: 0;
+    margin-top: 0;
+    pointer-events: none;
+    box-shadow: 0 0 0 2px rgba(255,255,255,0.4);
+  }
+  .state-select-wrap .state-select {
+    position: absolute;
+    top: -4px; left: -4px;
+    width: 16px;
+    height: 16px;
+    opacity: 0;
+    cursor: pointer;
+  }
+  header .icon-btn.edit-toggle.active {
+    opacity: 1;
+    background: rgba(94, 106, 210, 0.4);
+    border-radius: 4px;
+  }
   .row1 { display: flex; gap: 6px; align-items: baseline; }
   .row1 a {
     color: #fff; text-decoration: none; font-weight: 500; flex: 1;
@@ -240,6 +287,16 @@ export const className = `
  *   refreshing: boolean,
  * }} State
  */
+// localStorage から永続化された設定を読み込む（起動時 1 回）
+function loadBool(key, defaultValue) {
+  try {
+    const v = localStorage.getItem(key);
+    if (v === "true") return true;
+    if (v === "false") return false;
+  } catch {}
+  return defaultValue;
+}
+
 /** @type {State} */
 export const initialState = {
   tab: "mine",
@@ -248,6 +305,15 @@ export const initialState = {
   lastUpdated: null,
   lastError: null,
   refreshing: false,
+  // 完了・キャンセル issues の表示制御。デフォルトは非表示（Tauri 版と揃える）
+  showDone: loadBool("liglance.showDone", false),
+  showCanceled: loadBool("liglance.showCanceled", false),
+  // 編集モード: ON でステータス変更可。誤クリック防止のためデフォルト OFF
+  editMode: loadBool("liglance.editMode", false),
+  /** @type {Record<string, Array<{id:string,name:string,color:string,type:string,position?:number}>>} */
+  statesByTeam: {},
+  /** @type {string | null} */
+  updatingIssueId: null,
 };
 
 /** 取得結果(string)を state に反映する共通処理 */
@@ -292,6 +358,21 @@ export const updateState = (event, prev) => {
       return { ...prev, tab: event.tab };
     case "SET_PROJECT":
       return { ...prev, projectId: event.projectId };
+    case "SET_SHOW_DONE":
+      try { localStorage.setItem("liglance.showDone", String(event.value)); } catch {}
+      return { ...prev, showDone: event.value };
+    case "SET_SHOW_CANCELED":
+      try { localStorage.setItem("liglance.showCanceled", String(event.value)); } catch {}
+      return { ...prev, showCanceled: event.value };
+    case "SET_EDIT_MODE":
+      try { localStorage.setItem("liglance.editMode", String(event.value)); } catch {}
+      return { ...prev, editMode: event.value };
+    case "STATES_FETCHED":
+      return { ...prev, statesByTeam: event.statesByTeam };
+    case "UPDATE_START":
+      return { ...prev, updatingIssueId: event.issueId };
+    case "UPDATE_END":
+      return { ...prev, updatingIssueId: null };
     default:
       return prev;
   }
@@ -299,8 +380,48 @@ export const updateState = (event, prev) => {
 
 // --- render -------------------------------------------------------------
 /** @param {State} state @param {(action:any)=>void} dispatch */
+// 状態取得 fetch を 1 回だけ走らせるためのフラグ
+let statesFetchInFlight = false;
+
+function fetchStatesOnce(dispatch) {
+  if (statesFetchInFlight) return;
+  statesFetchInFlight = true;
+  run("bash liglance.widget/lib/fetch-states.sh 2>/dev/null || bash lib/fetch-states.sh 2>/dev/null")
+    .then((out) => {
+      try {
+        const d = JSON.parse(out);
+        const map = {};
+        for (const m of d?.data?.viewer?.teamMemberships?.nodes ?? []) {
+          if (m.team?.id) map[m.team.id] = m.team.states?.nodes ?? [];
+        }
+        dispatch({ type: "STATES_FETCHED", statesByTeam: map });
+      } catch {}
+    })
+    .finally(() => { statesFetchInFlight = false; });
+}
+
+function changeIssueState(dispatch, issueId, stateId) {
+  if (!issueId || !stateId) return;
+  dispatch({ type: "UPDATE_START", issueId });
+  // env 変数経由でシェルに渡す（引数より安全）
+  const cmd = `ISSUE_ID='${issueId.replace(/'/g, "")}' STATE_ID='${stateId.replace(/'/g, "")}' bash liglance.widget/lib/update-state.sh 2>/dev/null || ISSUE_ID='${issueId.replace(/'/g, "")}' STATE_ID='${stateId.replace(/'/g, "")}' bash lib/update-state.sh 2>/dev/null`;
+  run(cmd)
+    .then(() => {
+      // メイン fetch を再実行して最新化
+      return run(FETCH_CMD);
+    })
+    .then((out) => dispatch({ type: "MANUAL_RESULT", output: String(out) }))
+    .catch((err) => dispatch({ type: "MANUAL_RESULT", error: err }))
+    .finally(() => dispatch({ type: "UPDATE_END" }));
+}
+
 export const render = (state, dispatch) => {
-  const { output, lastError, lastUpdated, refreshing, tab, projectId } = state;
+  const { output, lastError, lastUpdated, refreshing, tab, projectId, showDone, showCanceled, editMode, statesByTeam, updatingIssueId } = state;
+
+  // 編集モード ON で states 未取得なら fetch
+  if (editMode && Object.keys(statesByTeam).length === 0) {
+    fetchStatesOnce(dispatch);
+  }
 
   // データ未取得 → Loading
   if (!output && !lastError) {
@@ -336,7 +457,7 @@ export const render = (state, dispatch) => {
   const projects = collectProjects(viewer);
 
   // 現在のタブに応じて表示する Issue を決める
-  const issues = pickIssues(viewer, tab, projectId);
+  const issues = pickIssues(viewer, tab, projectId, showDone, showCanceled);
 
   return (
     <div>
@@ -352,6 +473,13 @@ export const render = (state, dispatch) => {
         <TabButton active={tab === "project"} onClick={() => dispatch({ type: "SET_TAB", tab: "project" })}>
           Project
         </TabButton>
+        <span className="tabs-spacer" />
+        <FilterChip active={showDone} onClick={() => dispatch({ type: "SET_SHOW_DONE", value: !showDone })} title="Done を表示">
+          ✓ Done
+        </FilterChip>
+        <FilterChip active={showCanceled} onClick={() => dispatch({ type: "SET_SHOW_CANCELED", value: !showCanceled })} title="Canceled を表示">
+          ✗ Canc.
+        </FilterChip>
       </div>
 
       {tab === "project" && (
@@ -378,9 +506,34 @@ export const render = (state, dispatch) => {
         </div>
       ) : (
         <ul className="issues">
-          {issues.map((issue) => (
+          {issues.map((issue) => {
+            const teamId = issue.team?.id || "";
+            const states = statesByTeam[teamId] || [];
+            const isUpdating = updatingIssueId === issue.id;
+            return (
             <li key={issue.identifier} className="issue">
-              <span className="dot" style={{ background: issue.state?.color || "#888" }} />
+              {editMode && states.length > 0 ? (
+                <span className="state-select-wrap">
+                  <span className="dot" style={{ background: issue.state?.color || "#888" }} />
+                  <select
+                    className="state-select"
+                    value={issue.state?.id || ""}
+                    onChange={(e) => changeIssueState(dispatch, issue.id, e.target.value)}
+                    title={`ステータス変更 (現在: ${issue.state?.name || "—"})`}
+                  >
+                    {states
+                      .slice()
+                      .sort((a, b) => (a.position || 0) - (b.position || 0))
+                      .map((s) => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                  </select>
+                </span>
+              ) : isUpdating ? (
+                <span className="dot updating" title="更新中" />
+              ) : (
+                <span className="dot" style={{ background: issue.state?.color || "#888" }} />
+              )}
               <div>
                 <div className="row1">
                   <PriorityBadge priority={issue.priority} />
@@ -397,7 +550,8 @@ export const render = (state, dispatch) => {
                 </div>
               </div>
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
     </div>
@@ -430,6 +584,13 @@ function renderHeader(state, dispatch) {
       <span className="status-dot" style={{ background: statusColor, color: statusColor }} title={statusTitle} />
       <span className="last-updated">{lastUpdated ? formatTime(lastUpdated) : "—"}</span>
       <span className="spacer" />
+      <button
+        className={"icon-btn edit-toggle" + (state.editMode ? " active" : "")}
+        onClick={() => dispatch({ type: "SET_EDIT_MODE", value: !state.editMode })}
+        title={state.editMode ? "編集モード: ON" : "編集モード: OFF"}
+      >
+        {state.editMode ? "🔓" : "🔒"}
+      </button>
       <button
         className={"icon-btn" + (refreshing ? " spinning" : "")}
         onClick={handleRefresh}
@@ -481,14 +642,24 @@ function sortByPriorityThenUpdated(a, b) {
   return a.updatedAt < b.updatedAt ? 1 : -1;
 }
 
-function pickIssues(viewer, tab, projectId) {
+/** showDone/showCanceled に応じて state.type で除外 */
+function filterByStateType(issues, showDone, showCanceled) {
+  return issues.filter((i) => {
+    const t = i.state?.type;
+    if (t === "completed" && !showDone) return false;
+    if (t === "canceled" && !showCanceled) return false;
+    return true;
+  });
+}
+
+function pickIssues(viewer, tab, projectId, showDone, showCanceled) {
   if (!viewer) return [];
   if (tab === "mine") {
-    return (viewer.assignedIssues?.nodes ?? []).slice().sort(sortByPriorityThenUpdated);
+    return filterByStateType(viewer.assignedIssues?.nodes ?? [], showDone, showCanceled)
+      .slice()
+      .sort(sortByPriorityThenUpdated);
   }
-  // Team と Project は teamMemberships.team.issues を平らに結合
   const seen = new Set();
-  /** @type {any[]} */
   const all = [];
   for (const m of viewer.teamMemberships?.nodes ?? []) {
     for (const i of m.team?.issues?.nodes ?? []) {
@@ -497,11 +668,20 @@ function pickIssues(viewer, tab, projectId) {
       all.push(i);
     }
   }
+  const filtered = filterByStateType(all, showDone, showCanceled);
   if (tab === "project") {
     if (!projectId) return [];
-    return all.filter((i) => i.project?.id === projectId).sort(sortByPriorityThenUpdated);
+    return filtered.filter((i) => i.project?.id === projectId).sort(sortByPriorityThenUpdated);
   }
-  return all.sort(sortByPriorityThenUpdated);
+  return filtered.sort(sortByPriorityThenUpdated);
+}
+
+function FilterChip({ active, onClick, title, children }) {
+  return (
+    <button className={"filter-chip" + (active ? " active" : "")} onClick={onClick} title={title}>
+      {children}
+    </button>
+  );
 }
 
 function TabButton({ active, onClick, children }) {

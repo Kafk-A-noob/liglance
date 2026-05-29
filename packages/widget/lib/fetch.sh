@@ -26,7 +26,7 @@ query {
   viewer {
     id
     name
-    assignedIssues(filter: { state: { type: { neq: "completed" } } }, first: 50, orderBy: updatedAt) {
+    assignedIssues( first: 50, orderBy: updatedAt) {
       nodes {
         id identifier title url updatedAt
         priority priorityLabel
@@ -39,7 +39,7 @@ query {
       nodes {
         team {
           id key name
-          issues(filter: { state: { type: { neq: "completed" } } }, first: 30, orderBy: updatedAt) {
+          issues( first: 30, orderBy: updatedAt) {
             nodes {
               id identifier title url updatedAt
               priority priorityLabel
