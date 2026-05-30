@@ -1,6 +1,6 @@
 [package]
 name = "liglance"
-version = "0.1.0"
+version = "0.2.2"
 description = "LiGlance — Linear issues Glance, menubar app for macOS"
 authors = ["Kafk-A-noob"]
 license = "MIT"
