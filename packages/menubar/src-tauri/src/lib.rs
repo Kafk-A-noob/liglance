@@ -27,7 +27,11 @@ use keyring::Entry;
 const KEYCHAIN_SERVICE: &str = "linear-widget-token";
 
 fn keychain_account() -> String {
-    std::env::var("USER").unwrap_or_else(|_| "default".to_string())
+    // macOS/Linux は $USER、Windows は $USERNAME が標準。
+    // 両方試して取れた方を使う。
+    std::env::var("USER")
+        .or_else(|_| std::env::var("USERNAME"))
+        .unwrap_or_else(|_| "default".to_string())
 }
 
 // --- Tauri コマンド: トークン CRUD ----------------------------------------
