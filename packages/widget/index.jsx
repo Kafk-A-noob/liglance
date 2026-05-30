@@ -99,7 +99,9 @@ export const className = `
   border: 1px solid rgba(255,255,255,0.08);
   border-radius: 12px;
   padding: 10px 12px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+  /* drop-shadow を使うと bounding box ではなく不透明形状（角丸）に沿った影になり、
+     box-shadow で出ていた「後ろに薄い四角」が消える */
+  filter: drop-shadow(0 4px 12px rgba(0,0,0,0.4));
 
   /* ヘッダー行（ドラッグハンドル） */
   header {
@@ -461,6 +463,20 @@ export const updateState = (event, prev) => {
 
 // --- render -------------------------------------------------------------
 /** @param {State} state @param {(action:any)=>void} dispatch */
+/**
+ * URL を macOS 既定ブラウザで開く。
+ * target="_blank" の WebKit デフォルトでは別ブラウザに飛ばされて
+ * 未ログイン → OAuth 画面、という事故が起きるので、こちらで
+ * `open <url>` を実行して必ず既定ブラウザに渡す。
+ *
+ * セキュリティ: http(s) 以外は無視。シングルクォートだけエスケープ。
+ */
+function openInDefaultBrowser(url) {
+  if (!/^https?:\/\//i.test(url)) return;
+  const safe = url.replace(/'/g, "%27");
+  run(`open '${safe}'`);
+}
+
 // スクロール可能方向のヒント表示。ul に attach し、親 div に can-up/can-down を付け外し
 function attachScrollHints(ul) {
   if (!ul || ul.__lgScrollAttached) return;
@@ -517,7 +533,9 @@ function changeIssueState(dispatch, issueId, stateId) {
 }
 
 export const render = (state, dispatch) => {
-  const { output, lastError, lastUpdated, refreshing, tab, projectId, showDone, showCanceled, showBacklog, showInReview, showDuplicate, editMode, statesByTeam, updatingIssueId } = state;
+  // lastUpdated / refreshing は renderHeader(state, dispatch) 経由で使うので、
+  // ここで destructure しない (lint 警告回避)
+  const { output, lastError, tab, projectId, showDone, showCanceled, showBacklog, showInReview, showDuplicate, editMode, statesByTeam, updatingIssueId } = state;
 
   // 編集モード ON で states 未取得なら fetch
   if (editMode && Object.keys(statesByTeam).length === 0) {
@@ -646,7 +664,21 @@ export const render = (state, dispatch) => {
                 <div className="row1">
                   <PriorityBadge priority={issue.priority} />
                   <span className="ident">{issue.identifier}</span>
-                  <a href={safeUrl(issue.url)} target="_blank" rel="noreferrer">{issue.title}</a>
+                  <a
+                    href={safeUrl(issue.url)}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      openInDefaultBrowser(safeUrl(issue.url));
+                    }}
+                    onAuxClick={(e) => {
+                      if (e.button === 1) {
+                        e.preventDefault();
+                        openInDefaultBrowser(safeUrl(issue.url));
+                      }
+                    }}
+                  >
+                    {issue.title}
+                  </a>
                 </div>
                 <div className="meta">
                   <span>{issue.state?.name}</span>
