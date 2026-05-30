@@ -19,6 +19,9 @@
     "react-dom": "^19.1.0",
     "@tauri-apps/api": "^2"
   },
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild"]
+  },
   "devDependencies": {
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",

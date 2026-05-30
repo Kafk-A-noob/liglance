@@ -73,6 +73,19 @@ export function redactSecrets(s: string): string {
     );
 }
 
+/**
+ * 実行中の OS を WebView の userAgent から推定する。
+ * Tauri は OS ネイティブの WebView を使う（Windows=WebView2 / macOS=WKWebView）ため、
+ * userAgent に macOS なら "Macintosh"、Windows なら "Windows" が含まれる。
+ * プラグイン（@tauri-apps/plugin-os）を足さずに軽量に判定したいのでこの方式を採る。
+ */
+export function detectOS(): "mac" | "windows" | "other" {
+  const ua = navigator.userAgent;
+  if (/Macintosh|Mac OS X/i.test(ua)) return "mac";
+  if (/Windows/i.test(ua)) return "windows";
+  return "other";
+}
+
 /** timestamp(ms) → "MM/DD HH:mm" 形式で常に日付付き */
 export function formatTime(ms: number): string {
   const d = new Date(ms);
