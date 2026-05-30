@@ -479,6 +479,15 @@ function IssueList({
                   e.preventDefault();
                   void openUrl(safeUrl(issue.url));
                 }}
+                onAuxClick={(e) => {
+                  // 中クリック (button === 1) も同じ経路で開く。
+                  // 既定の WebKit 挙動だと別ブラウザに渡って未ログイン → OAuth 画面
+                  // という事故が起きるので、こちらで一律 openUrl に倒す。
+                  if (e.button === 1) {
+                    e.preventDefault();
+                    void openUrl(safeUrl(issue.url));
+                  }
+                }}
               >
                 {issue.title}
               </a>
