@@ -9,6 +9,16 @@ export const tokenExists = (): Promise<boolean> =>
 export const saveToken = (token: string): Promise<void> =>
   invoke<void>("save_token", { token });
 
+/** トークンが有効か Linear API で検証（Keychain には触らない） */
+export type ValidateTokenResult = {
+  ok: boolean;
+  /** Rust 側のフィールド名は viewer_name (serde 既定) */
+  viewer_name?: string | null;
+  error?: string | null;
+};
+export const validateToken = (token: string): Promise<ValidateTokenResult> =>
+  invoke<ValidateTokenResult>("validate_token", { token });
+
 export const deleteToken = (): Promise<void> => invoke<void>("delete_token");
 
 /**

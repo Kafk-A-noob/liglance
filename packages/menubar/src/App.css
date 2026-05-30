@@ -99,6 +99,11 @@ a {
   font-size: 11px;
   margin-top: 4px;
 }
+.welcome-msg {
+  color: #4ade80;
+  font-size: 11px;
+  margin-top: 4px;
+}
 
 /* --- ヘッダー ------------------------------------------------------- */
 header {

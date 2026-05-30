@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { tokenExists, saveToken, fetchLinear, fetchStates, openUrl, updateIssueState } from "./api";
+import { tokenExists, saveToken, fetchLinear, fetchStates, openUrl, updateIssueState, validateToken } from "./api";
 import type { Issue, IssueState, LinearResponse, Project, Tab, Viewer } from "./types";
 import { formatRelative, formatTime, priorityRank, redactSecrets, safeUrl } from "./utils";
 import { PriorityBadge } from "./PriorityBadge";
@@ -37,26 +37,60 @@ export default function App() {
 // =====================================================================
 function TokenWizard({ onSaved }: { onSaved: () => void }) {
   const [token, setToken] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [phase, setPhase] = useState<"idle" | "validating" | "saving" | "done">("idle");
   const [error, setError] = useState<string | null>(null);
+  const [welcomeName, setWelcomeName] = useState<string | null>(null);
 
-  const submit = async (e: React.FormEvent) => {
+  // React 19 で FormEvent 等の型エイリアスが deprecated 化したので、
+  // preventDefault だけ使う最小の構造的型で受ける
+  const submit = async (e: { preventDefault: () => void }) => {
     e.preventDefault();
-    if (!token.startsWith("lin_api_")) {
+    setError(null);
+    setWelcomeName(null);
+
+    // 1. フォーマット先行チェック（API 叩く前に弾く）
+    const trimmed = token.trim();
+    if (!trimmed.startsWith("lin_api_")) {
       setError("Linear の Personal API Key は 'lin_api_' で始まります");
       return;
     }
-    setSaving(true);
-    setError(null);
+
+    // 2. Linear API で実際に検証（Keychain には触らない）
+    setPhase("validating");
+    let result;
     try {
-      await saveToken(token.trim());
-      onSaved();
+      result = await validateToken(trimmed);
     } catch (err) {
-      setError(String(err));
-    } finally {
-      setSaving(false);
+      setError(`検証時のエラー: ${String(err)}`);
+      setPhase("idle");
+      return;
+    }
+    if (!result.ok) {
+      setError(result.error || "トークンが無効です。Linear で再発行してください。");
+      setPhase("idle");
+      return;
+    }
+
+    // 3. 検証通ったら Keychain に保存
+    setWelcomeName(result.viewer_name ?? null);
+    setPhase("saving");
+    try {
+      await saveToken(trimmed);
+      setPhase("done");
+      // 一瞬「Welcome, X」を見せてから遷移（800ms ほど）
+      setTimeout(() => onSaved(), 800);
+    } catch (err) {
+      setError(`保存時のエラー: ${String(err)}`);
+      setPhase("idle");
     }
   };
+
+  const busy = phase === "validating" || phase === "saving" || phase === "done";
+  const buttonLabel =
+    phase === "validating" ? "検証中…" :
+    phase === "saving"     ? "保存中…" :
+    phase === "done"       ? "完了 ✓" :
+                             "確認して保存";
 
   return (
     <div className="root wizard">
@@ -73,10 +107,16 @@ function TokenWizard({ onSaved }: { onSaved: () => void }) {
           value={token}
           onChange={(e) => setToken(e.target.value)}
           autoFocus
+          disabled={busy}
         />
-        <button type="submit" disabled={saving || !token}>
-          {saving ? "保存中…" : "保存して開始"}
+        <button type="submit" disabled={busy || !token}>
+          {buttonLabel}
         </button>
+        {welcomeName && (
+          <div className="welcome-msg">
+            ✓ 接続成功。Welcome, <b>{welcomeName}</b> さん！
+          </div>
+        )}
         {error && <div className="error-msg">{error}</div>}
       </form>
       <p className="hint">
