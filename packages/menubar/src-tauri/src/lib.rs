@@ -258,6 +258,84 @@ async fn fetch_linear(exclude_types: Vec<String>) -> Result<String, String> {
     Ok(text)
 }
 
+/// ウィザード用: 受け取ったトークンで Linear API を 1 回叩いて、
+/// 有効かどうか + viewer 名を返す。Keychain には触らない（保存前検証）。
+#[derive(Serialize)]
+struct ValidateResult {
+    ok: bool,
+    viewer_name: Option<String>,
+    error: Option<String>,
+}
+
+#[tauri::command]
+async fn validate_token(token: String) -> Result<ValidateResult, String> {
+    // フォーマット軽くチェック（明らかにおかしいものは API 叩く前に弾く）
+    let t = token.trim();
+    if t.is_empty() {
+        return Ok(ValidateResult { ok: false, viewer_name: None, error: Some("EMPTY".to_string()) });
+    }
+    if !t.starts_with("lin_api_") {
+        return Ok(ValidateResult {
+            ok: false,
+            viewer_name: None,
+            error: Some("Linear の Personal API Key は 'lin_api_' で始まります".to_string()),
+        });
+    }
+
+    let body = GqlBody {
+        query: "query { viewer { id name } }".to_string(),
+    };
+
+    let client = reqwest::Client::new();
+    let resp = client
+        .post("https://api.linear.app/graphql")
+        .header("Authorization", t)
+        .header("Content-Type", "application/json")
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| format!("http: {}", e))?;
+
+    let status = resp.status();
+    let text = resp.text().await.map_err(|e| format!("read body: {}", e))?;
+    let parsed: serde_json::Value = serde_json::from_str(&text)
+        .map_err(|e| format!("invalid JSON from Linear: {}", e))?;
+
+    // GraphQL レベルのエラー（認証含む）
+    if let Some(errors) = parsed.get("errors").and_then(|e| e.as_array()) {
+        let msg = errors
+            .first()
+            .and_then(|e| e.get("message"))
+            .and_then(|m| m.as_str())
+            .unwrap_or("API error")
+            .to_string();
+        return Ok(ValidateResult { ok: false, viewer_name: None, error: Some(msg) });
+    }
+
+    if !status.is_success() {
+        return Ok(ValidateResult {
+            ok: false,
+            viewer_name: None,
+            error: Some(format!("HTTP {}", status.as_u16())),
+        });
+    }
+
+    let name = parsed
+        .pointer("/data/viewer/name")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+
+    if name.is_none() {
+        return Ok(ValidateResult {
+            ok: false,
+            viewer_name: None,
+            error: Some("レスポンスに viewer.name が含まれません".to_string()),
+        });
+    }
+
+    Ok(ValidateResult { ok: true, viewer_name: name, error: None })
+}
+
 /// Issue のステータス（workflow state）を変更する。
 /// Linear GraphQL の issueUpdate mutation を呼ぶ。
 #[tauri::command]
@@ -358,6 +436,7 @@ pub fn run() {
             fetch_states,
             open_url,
             update_issue_state,
+            validate_token,
         ])
         .setup(|app| {
             // macOS: Dock から消す（メニューバーアプリにする）
