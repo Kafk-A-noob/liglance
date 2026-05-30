@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { tokenExists, saveToken, fetchLinear, fetchStates, openUrl, updateIssueState, validateToken } from "./api";
 import type { Issue, IssueState, LinearResponse, Project, Tab, Viewer } from "./types";
-import { formatRelative, formatTime, priorityRank, redactSecrets, safeUrl } from "./utils";
+import { detectOS, formatRelative, formatTime, priorityRank, redactSecrets, safeUrl } from "./utils";
 import { PriorityBadge } from "./PriorityBadge";
 import "./App.css";
 
@@ -40,6 +40,7 @@ function TokenWizard({ onSaved }: { onSaved: () => void }) {
   const [phase, setPhase] = useState<"idle" | "validating" | "saving" | "done">("idle");
   const [error, setError] = useState<string | null>(null);
   const [welcomeName, setWelcomeName] = useState<string | null>(null);
+  const os = detectOS();
 
   // React 19 で FormEvent 等の型エイリアスが deprecated 化したので、
   // preventDefault だけ使う最小の構造的型で受ける
@@ -120,8 +121,17 @@ function TokenWizard({ onSaved }: { onSaved: () => void }) {
         {error && <div className="error-msg">{error}</div>}
       </form>
       <p className="hint">
-        トークンは macOS Keychain に暗号化保存されます。
-        Übersicht 版がインストール済みなら、そちらでも同じトークンを使えます。
+        {os === "mac"
+          ? "トークンは macOS Keychain に暗号化保存されます。"
+          : os === "windows"
+          ? "トークンは Windows の資格情報マネージャーに暗号化保存されます。"
+          : "トークンは OS の資格情報ストアに暗号化保存されます。"}
+        {os === "mac" && (
+          <>
+            <br />
+            Übersicht 版がインストール済みなら、そちらでも同じトークンを使えます。
+          </>
+        )}
       </p>
     </div>
   );

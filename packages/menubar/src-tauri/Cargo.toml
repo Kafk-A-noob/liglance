@@ -27,5 +27,10 @@ image = { version = "0.25", default-features = false, features = ["png"] }
 
 # macOS 以外は Keychain アクセスに keyring crate を使う
 # (macOS は dev ビルドの ACL 問題回避のため shell 経由の security CLI を使う)
-[target.'cfg(not(target_os = "macos"))'.dependencies]
+# Windows: windows-credential フィーチャーを明示しないと資格情報マネージャーが使われず
+# メモリ上の mock ストアにフォールバックしてしまう（再起動で消える）
+[target.'cfg(target_os = "windows")'.dependencies]
+keyring = { version = "3", features = ["windows-native"] }
+
+[target.'cfg(all(not(target_os = "macos"), not(target_os = "windows")))'.dependencies]
 keyring = "3"
